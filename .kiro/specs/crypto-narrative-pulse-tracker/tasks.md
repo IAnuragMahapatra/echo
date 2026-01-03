@@ -82,12 +82,12 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
   - Verify pulse score calculation works
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 7. HTTP Webhook Connector for Messages
-  - [ ] 7.1 Create connectors/webhook.py with Pathway HTTP connector
+- [x] 7. HTTP Webhook Connector for Messages
+  - [x] 7.1 Create connectors/webhook.py with Pathway HTTP connector
     - Use pw.io.http.rest_connector() following template patterns
     - Configure for MessageSchema ingestion
     - _Requirements: 1.5_
-  - [ ] 7.2 Add tag filtering to pipeline
+  - [x] 7.2 Add tag filtering to pipeline
     - Filter messages by configurable tag patterns (e.g., #Solana, $MEME)
     - Use pw.Table.filter() with tag matching logic
     - _Requirements: 1.4_
