@@ -52,8 +52,8 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
     - **Property 22: Hype Simulator Phase Sentiment**
     - **Validates: Requirements 10.3**
 
-- [ ] 4. Sentiment Analysis Pipeline
-  - [ ] 4.1 Create transforms/sentiment.py with SentimentAnalyzer class
+- [x] 4. Sentiment Analysis Pipeline
+  - [x] 4.1 Create transforms/sentiment.py with SentimentAnalyzer class
     - Use VADER sentiment analyzer (vaderSentiment library)
     - Add crypto-specific lexicon (moon, pump, dump, rug, bullish, bearish, hodl, fomo, fud)
     - Return score in [-1, 1] range
@@ -61,7 +61,7 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
   - [ ]* 4.2 Write property test for sentiment score range
     - **Property 5: Sentiment Score Range**
     - **Validates: Requirements 3.1**
-  - [ ] 4.3 Integrate sentiment into Pathway pipeline
+  - [x] 4.3 Integrate sentiment into Pathway pipeline
     - Use pw.apply() to add sentiment scores to message stream
     - Use pw.temporal.sliding() with 5-min duration, 1-min hop for velocity
     - Use pw.reducers.avg() for velocity aggregation
