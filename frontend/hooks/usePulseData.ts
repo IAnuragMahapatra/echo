@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface PulseDataPoint {
   time: string;
@@ -22,14 +22,27 @@ export const usePulseData = () => {
     consensus: "Neutral",
   });
 
-  useEffect(() => {
-    // Use a ref to accumulate all generated points at the emission rate,
-    // but update React state at a lower/higher frequency to avoid too many re-renders.
-    const dataRef = { current: [] as PulseDataPoint[] };
+  const dataRef = useRef<PulseDataPoint[]>([]);
+  const lastUpdateRef = useRef<number>(0);
+  const metricsUpdateRef = useRef<number>(0);
 
+  const allPhrases = useRef([
+    "moon soon",
+    "dev based", 
+    "chart cooking",
+    "fud detected",
+    "accumulation",
+    "breakout",
+    "liquidity grab",
+    "wagmi",
+    "ngmi",
+    "send it",
+  ]);
+
+  useEffect(() => {
     const emitter = setInterval(() => {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString("en-US", { hour12: false });
+      const now = Date.now();
+      const timeStr = new Date(now).toLocaleTimeString("en-US", { hour12: false });
 
       const lastPrice = dataRef.current.length > 0 ? dataRef.current[dataRef.current.length - 1].price : 100;
       const volatility = (Math.random() - 0.5) * 5;
@@ -44,42 +57,36 @@ export const usePulseData = () => {
         sentiment: parseFloat(sentiment.toFixed(2)),
       };
 
-      dataRef.current = [...dataRef.current, newPoint];
+      dataRef.current.push(newPoint);
       if (dataRef.current.length > 300) {
-        dataRef.current = dataRef.current.slice(dataRef.current.length - 300);
+        dataRef.current = dataRef.current.slice(-300);
       }
 
-      // Update metrics less frequently (every emitter tick is fine here)
-      setMetrics((prev) => {
-        const newScore = Math.max(1, Math.min(10, prev.score + (Math.random() - 0.5)));
+      // Update metrics less frequently (every 1000ms instead of 500ms)
+      if (now - metricsUpdateRef.current > 1000) {
+        metricsUpdateRef.current = now;
+        setMetrics((prev) => {
+          const newScore = Math.max(1, Math.min(10, prev.score + (Math.random() - 0.5)));
+          const shuffled = [...allPhrases.current].sort(() => 0.5 - Math.random());
 
-        const allPhrases = [
-          "moon soon",
-          "dev based",
-          "chart cooking",
-          "fud detected",
-          "accumulation",
-          "breakout",
-          "liquidity grab",
-          "wagmi",
-          "ngmi",
-          "send it",
-        ];
-        const shuffled = allPhrases.sort(() => 0.5 - Math.random());
-
-        return {
-          score: parseFloat(newScore.toFixed(1)),
-          phrases: shuffled.slice(0, 5),
-          consensus: newScore > 6 ? "Bullish" : newScore < 4 ? "Bearish" : "Neutral",
-        };
-      });
+          return {
+            score: parseFloat(newScore.toFixed(1)),
+            phrases: shuffled.slice(0, 5),
+            consensus: newScore > 6 ? "Bullish" : newScore < 4 ? "Bearish" : "Neutral",
+          };
+        });
+      }
     }, 500);
 
-    // UI update interval — control how often React state updates (smoothness vs freshness)
+    // UI update interval — reduced frequency for better performance
     const uiInterval = setInterval(() => {
-      // shallow copy to trigger state update only at this cadence
-      setData((_) => [...dataRef.current]);
-    }, 200);
+      const now = Date.now();
+      // Throttle UI updates to max once per 300ms
+      if (now - lastUpdateRef.current > 300) {
+        lastUpdateRef.current = now;
+        setData([...dataRef.current]);
+      }
+    }, 300);
 
     return () => {
       clearInterval(emitter);

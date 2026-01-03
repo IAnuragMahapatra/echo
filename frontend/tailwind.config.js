@@ -111,6 +111,10 @@ module.exports = {
           "0%": { backgroundPosition: "200% 0" },
           "100%": { backgroundPosition: "-200% 0" },
         },
+        "pulse-slow": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -128,7 +132,7 @@ module.exports = {
         "crt-flicker": "crt-flicker 0.15s infinite",
         "glitch":
           "glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite",
-        "shimmer": "shimmer 3s linear infinite",
+        "pulse-slow": "pulse-slow 3s ease-in-out infinite",
       },
     },
   },

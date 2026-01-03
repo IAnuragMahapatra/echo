@@ -34,37 +34,24 @@ export default function Page() {
         {/* TEXT */}
         <div className="max-w-7xl mx-auto px-16">
           <p className="text-xs tracking-widest text-white/40 mb-8">
-            · pathway
+            · ECHO
           </p>
 
           <h1 className="text-[3.8rem] leading-tight font-medium text-white/80">
-            We wanted to
+            Echo is an
             <br />
-            understand the{" "}
-            <span className="text-white">why</span>.
+            AI-powered narrative 
+            <br/>
+            intelligence engine
+          
             <br />
-            We&apos;re fundamentally
+            designed for the high-velocity world 
             <br />
-            changing the way
-            <br />
-            models think.
+           of cryptocurrency.
+          
           </h1>
 
-          <div className="mt-12">
-            <div className="bg-white rounded-md w-[320px] p-4 text-black">
-              <p className="text-sm font-medium mb-2">
-                Join the waitlist
-              </p>
-              <div className="flex items-center gap-2 border-b border-black/30 pb-1">
-                <input
-                  placeholder="example@email.com"
-                  className="flex-1 outline-none text-sm"
-                />
-                <span>→</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      </div>
       </section>
 
       {/* ================= ANNOUNCEMENT ================= */}
@@ -79,28 +66,30 @@ export default function Page() {
           }}
         />
 
-        <div className="relative z-10 bg-black rounded-[36px] border border-white/10 px-24 py-28 text-center max-w-4xl">
-          <p className="text-sm text-white/60 mb-6">
-            The massively parallel post-Transformer reasoning architecture
-            which opens the door to <span className="text-white">generalization</span> over time.
-          </p>
+      <div className="relative z-10 bg-black rounded-[36px] border border-white/10 px-24 py-28 text-center max-w-4xl">
+  {/* HERO LINE */}
+  <p className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-8">
+    Listen to the Market <span className="text-white/60">Before It Moves.</span>
+  </p>
 
-          <h2 className="text-6xl font-medium mb-8">
-            Announcing <span className="text-white">BDH</span>
-          </h2>
+  {/* BODY COPY */}
+  <p className="text-white/75 text-base md:text-lg leading-relaxed mb-10">
+    While others look at charts, Echo listens to the conversation.
+    By processing thousands of social signals per second through our proprietary
+    Pathway streaming pipeline, we decode the chaos of market sentiment into a
+    single, actionable metric: the <span className="text-white font-medium">Pulse Score</span>.
+    We don’t just track what people are saying—we correlate it with price action
+    in real time to spot divergences, detect manipulation, and identify the next
+    breakout narrative before it hits the candles.
+    <br />
+    <br />
+    <span className="text-white font-medium">
+      Stop doom-scrolling. Start listening.
+    </span>
+  </p>
 
-          <p className="text-white/50 mb-12">
-            “The Missing Link Between the Transformer
-            <br />
-            and Models of the Brain”
-          </p>
 
-          <Link
-            href="#"
-            className="inline-block bg-white text-black px-10 py-4 rounded-md font-medium"
-          >
-            Read the paper →
-          </Link>
+         
         </div>
       </section>
 
@@ -112,7 +101,7 @@ export default function Page() {
             background:
               "linear-gradient(180deg, #0d3b66, #1b9aaa)",
             filter: "blur(80px)",
-            opacity: 0.8,
+            opacity: 0.45,
           }}
         />
 
@@ -121,46 +110,120 @@ export default function Page() {
             <h2 className="text-6xl font-medium mb-6">
               Created by
               <br />
-              scientists &
+              Developers
               <br />
-              researchers
             </h2>
 
             <p className="text-white/50 max-w-sm">
-              Headed by co-founder & CEO, Zuzanna Stamirowska,
-              CTO Jan Chorowski, and CSO Adrian Kosowski.
-              The team has already built AI tooling,
-              amassing 108k stars on Github.
+            
             </p>
 
-            <p className="mt-4 text-white underline">
-              Access our tooling here →
-            </p>
+            
           </div>
 
           <div className="grid grid-cols-3 gap-12">
             {[
-              "/team/1.jpg",
-              "/team/2.jpg",
-              "/team/3.jpg",
-            ].map((src) => (
+              {
+                src: "/photos/sona.jpeg",
+                name: "Sonakshi Pradhan",
+                role: "Frontend & UI Designer",
+              },
+              {
+                src: "/photos/srinu.jpeg",
+                name: "Srinibas",
+                role: "System Architect & Domain Expert",
+              },
+              {
+                src: "/photos/anurag.jpeg",
+                name: "Anurag",
+                role: "Backend & Data Architect",
+              },
+            ].map((member) => (
               <div
-                key={src}
-                className="p-[3px] rounded-md"
-                style={{
-                  background:
-                    "linear-gradient(180deg, #4cc9f0, #ffd166, #ef476f)",
-                }}
+                key={member.name}
+                className="flip-card w-full h-[420px] group"
               >
-                <img
-                  src={src}
-                  className="rounded-md object-cover w-full h-[420px]"
-                />
+                <div className="flip-inner h-full w-full">
+                  {/* FRONT - Image */}
+                  <div className="flip-front rounded-md overflow-hidden h-full w-full">
+                    <div
+                      className="p-[3px] rounded-md h-full flex items-center justify-center"
+                      style={{
+                        background:
+                          "linear-gradient(180deg, #4cc9f0, #ffd166, #ef476f)",
+                      }}
+                    >
+                      <img
+                        src={member.src}
+                        className="rounded-md object-cover w-full h-full"
+                        alt={member.name}
+                      />
+                    </div>
+                  </div>
+
+                  {/* BACK - Name & Role */}
+                  <div className="flip-back rounded-md h-full w-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-emerald-400/10 to-cyan-400/10 border border-emerald-400/20">
+                    <h3 className="text-2xl font-bold text-white mb-3">
+                      {member.name}
+                    </h3>
+                    <p className="text-emerald-400 font-semibold text-sm uppercase tracking-widest">
+                      {member.role}
+                    </p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* ================= FOOTER ================= */}
+      <footer className="relative border-t border-white/10 py-12 px-16">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-emerald-400/5 to-transparent" />
+        
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          {/* LEFT - CGAPI Logo */}
+          <div className="flex items-center gap-3">
+            <img
+              src="/photos/CGAPI-Lockup@2x-1.png"
+              alt="CGAPI"
+              className="h-8 object-contain"
+            />
+          </div>
+
+          {/* CENTER - Pathway Logo & Text */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs tracking-widest text-white/40">
+              POWERED BY
+            </span>
+            <img
+              src="/photos/pathway-logo-black.png"
+              alt="Pathway"
+              className="h-6 object-contain invert"
+            />
+          </div>
+
+          {/* RIGHT - Language Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs tracking-widest text-white/40">
+              LANGUAGE
+            </span>
+            <select className="bg-white/5 border border-white/10 rounded-md px-3 py-2 text-xs text-white cursor-pointer hover:bg-white/10 transition-colors">
+              <option value="en">English</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="ja">日本語</option>
+            </select>
+          </div>
+        </div>
+
+        {/* BOTTOM - Copyright */}
+        <div className="max-w-7xl mx-auto mt-8 pt-8 border-t border-white/5 text-center text-xs text-white/30">
+          © 2026 Echo. All rights reserved.
+        </div>
+
+      </footer>
     </main>
   );
 }
