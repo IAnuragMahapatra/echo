@@ -11,6 +11,7 @@ __pycache__/
 env/
 venv/
 ENV/
+.venv_demo/
 
 # --- Data & RAG Documents ---
 # Ignoring the 'data' directory contents (PDFs/Knowledge base)
