@@ -182,6 +182,27 @@ def create_api_app():
             }
         )
 
+    @app.route("/api/performance", methods=["GET"])
+    def get_performance():
+        """
+        Get current performance metrics (latency and throughput).
+
+        Requirements: 12.1, 12.2, 12.3
+        """
+        try:
+            from transforms.performance import get_performance_metrics
+
+            metrics = get_performance_metrics()
+            return jsonify(metrics.to_dict())
+        except ImportError:
+            return jsonify(
+                {
+                    "error": "Performance monitoring not available",
+                    "latency": {"avg_ms": 0, "warnings_count": 0},
+                    "throughput": {"current_mps": 0, "total_messages": 0},
+                }
+            )
+
     @app.route("/api/config", methods=["GET", "POST"])
     def config():
         """Get or update configuration."""
@@ -231,8 +252,13 @@ def create_api_app():
     @app.route("/api/simulate", methods=["POST"])
     def simulate():
         """Trigger a simulation step (for testing)."""
+        import time as time_module
+
         data = request.get_json() or {}
         phase = data.get("phase", "growth")
+
+        # Record ingestion time for latency tracking
+        ingestion_time = time_module.time()
 
         # Run one simulation step
         sentiment_analyzer = SentimentAnalyzer()
@@ -241,6 +267,19 @@ def create_api_app():
         message = generate_single_message(
             coin_symbol=current_metrics.tracked_coin, phase=phase
         )
+
+        # Track performance
+        try:
+            from transforms.performance import (
+                record_ingestion,
+                record_message_processed,
+            )
+
+            record_ingestion(message["message_id"], ingestion_time)
+            record_message_processed()
+        except ImportError:
+            pass
+
         sentiment = sentiment_analyzer.analyze(message["text"])
 
         # Update metrics

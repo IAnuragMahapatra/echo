@@ -23,6 +23,18 @@ from telegram.ext import (
     filters,
 )
 
+# Import performance monitoring
+try:
+    from transforms.performance import get_performance_metrics, record_alert
+except ImportError:
+    # Fallback if performance module not available
+    def record_alert(message_id: str, alert_time=None):
+        pass
+
+    def get_performance_metrics():
+        return None
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -187,6 +199,7 @@ class TelegramAlertBot:
         app.add_handler(CommandHandler("help", self._handle_help))
         app.add_handler(CommandHandler("query", self._handle_query))
         app.add_handler(CommandHandler("status", self._handle_status))
+        app.add_handler(CommandHandler("performance", self._handle_performance))
 
         # Add message handler for direct queries
         app.add_handler(
@@ -271,6 +284,14 @@ class TelegramAlertBot:
                 parse_mode="Markdown",
             )
             self._last_alert_score = score
+
+            # Record latency for performance monitoring (if message_id provided)
+            if hasattr(self, "_current_message_id") and self._current_message_id:
+                latency = record_alert(self._current_message_id)
+                if latency is not None:
+                    logger.debug(f"Alert latency: {latency:.2f}ms")
+                self._current_message_id = None
+
             logger.info(
                 f"Sent alert: score={score}, signal={'buy' if score >= 7 else 'cooling'}"
             )
@@ -279,6 +300,31 @@ class TelegramAlertBot:
         except Exception as e:
             logger.error(f"Failed to send alert: {e}")
             return False
+
+    async def send_alert_with_tracking(
+        self,
+        score: float,
+        phrases: list[str],
+        divergence: str = "aligned",
+        message_id: str = None,
+    ) -> bool:
+        """
+        Send a momentum alert with latency tracking.
+
+        Args:
+            score: Current pulse score (1-10)
+            phrases: List of trending phrases
+            divergence: Divergence status
+            message_id: Message ID for latency tracking
+
+        Returns:
+            True if alert was sent, False otherwise
+
+        Requirements: 9.1, 9.2, 9.5, 12.1
+        """
+        # Store message_id for latency recording
+        self._current_message_id = message_id
+        return await self.send_alert(score, phrases, divergence)
 
     def send_alert_sync(
         self,
@@ -527,6 +573,81 @@ _How fast sentiment is changing (+ = improving, - = declining)_
 _Use /query <question> for detailed AI analysis_"""
 
         await update.message.reply_text(status_message, parse_mode="Markdown")
+
+    async def _handle_performance(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+    ) -> None:
+        """
+        Handle /performance command to display system performance metrics.
+
+        Requirements: 12.1, 12.2, 12.3
+        """
+        perf_metrics = get_performance_metrics()
+
+        if perf_metrics is None:
+            await update.message.reply_text(
+                "⚠️ Performance monitoring is not available.",
+                parse_mode="Markdown",
+            )
+            return
+
+        metrics_dict = perf_metrics.to_dict()
+        latency = metrics_dict["latency"]
+        throughput = metrics_dict["throughput"]
+
+        # Format uptime
+        uptime_secs = metrics_dict["uptime_seconds"]
+        hours = int(uptime_secs // 3600)
+        minutes = int((uptime_secs % 3600) // 60)
+        seconds = int(uptime_secs % 60)
+        uptime_str = f"{hours}h {minutes}m {seconds}s"
+
+        # Latency status indicator
+        if latency["avg_ms"] == 0:
+            latency_status = "⚪ No data yet"
+        elif latency["avg_ms"] < 1000:
+            latency_status = "🟢 Excellent"
+        elif latency["avg_ms"] < 3000:
+            latency_status = "🟡 Good"
+        elif latency["avg_ms"] < 5000:
+            latency_status = "🟠 Moderate"
+        else:
+            latency_status = "🔴 High"
+
+        # Throughput status indicator
+        if throughput["current_mps"] == 0:
+            throughput_status = "⚪ Idle"
+        elif throughput["current_mps"] < 1:
+            throughput_status = "🟡 Low"
+        elif throughput["current_mps"] < 10:
+            throughput_status = "🟢 Normal"
+        else:
+            throughput_status = "🚀 High"
+
+        performance_message = f"""⚡ *System Performance: ${self.coin}*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *Latency Metrics:* {latency_status}
+• Average: {latency["avg_ms"]:.1f}ms
+• Min: {latency["min_ms"]:.1f}ms
+• Max: {latency["max_ms"]:.1f}ms
+• P95: {latency["p95_ms"]:.1f}ms
+• P99: {latency["p99_ms"]:.1f}ms
+• Warnings (>5s): {latency["warnings_count"]}
+
+📈 *Throughput Metrics:* {throughput_status}
+• Current: {throughput["current_mps"]:.2f} msg/sec
+• Overall Avg: {throughput["overall_avg_mps"]:.2f} msg/sec
+• Total Messages: {throughput["total_messages"]:,}
+
+⏱️ *Uptime:* {uptime_str}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+_Last updated: {metrics_dict["timestamp"]}_"""
+
+        await update.message.reply_text(performance_message, parse_mode="Markdown")
 
     async def _handle_message(
         self,

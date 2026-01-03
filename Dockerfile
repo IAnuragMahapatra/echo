@@ -2,15 +2,14 @@ FROM pathwaycom/pathway:latest
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y python3-opencv tesseract-ocr-eng \
-    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
-
+# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install -U --no-cache-dir -r requirements.txt
 
+# Copy application code
 COPY . .
 
-EXPOSE 8000
+# Expose webhook port for message ingestion
+EXPOSE 8080
 
 CMD ["python", "app.py"]

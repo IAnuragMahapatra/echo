@@ -358,6 +358,8 @@ if PATHWAY_AVAILABLE:
 
         Requirements: 8.4
         """
+        # Get performance monitor for throughput tracking
+        perf_monitor = get_performance_monitor()
 
         # Subscribe to sentiment velocity
         def on_velocity_change(key, row, time, is_addition):
@@ -365,6 +367,10 @@ if PATHWAY_AVAILABLE:
                 velocity = row.get("velocity", 0.0)
                 count = row.get("message_count", 0)
                 update_sentiment_velocity(velocity, count)
+
+                # Track throughput - record messages processed in this window
+                for _ in range(count):
+                    record_message_processed()
 
                 # Calculate and update pulse score
                 metrics = get_live_metrics()

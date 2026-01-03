@@ -189,12 +189,12 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
     - Calculate ratio: bullish_count / (bullish_count + bearish_count)
     - _Requirements: 6.3, 6.4_
 
-- [ ] 15. Performance Monitoring (Phase 3)
-  - [ ] 15.1 Add latency tracking
+- [x] 15. Performance Monitoring (Phase 3)
+  - [x] 15.1 Add latency tracking
     - Measure end-to-end latency from ingestion to alert
     - Log warning if latency > 5 seconds
     - _Requirements: 12.1, 12.4_
-  - [ ] 15.2 Add throughput metrics
+  - [x] 15.2 Add throughput metrics
     - Track messages per second
     - Display in dashboard
     - _Requirements: 12.2, 12.3_
