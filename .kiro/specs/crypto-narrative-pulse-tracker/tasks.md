@@ -48,6 +48,7 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
     - Configurable duration (3-5 mins) and message count (200)
     - _Requirements: 10.2_
   - [ ]* 3.4 Write property test for simulator phase sentiment
+
     - **Property 22: Hype Simulator Phase Sentiment**
     - **Validates: Requirements 10.3**
 
