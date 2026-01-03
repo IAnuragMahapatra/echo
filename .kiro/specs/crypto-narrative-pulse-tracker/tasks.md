@@ -76,7 +76,7 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
     - **Property 15: Pulse Score Calculation**
     - **Validates: Requirements 7.1-7.9**
 
-- [ ] 6. Checkpoint - Core Pipeline Working
+- [x] 6. Checkpoint - Core Pipeline Working
   - Ensure simulator can send messages to pipeline
   - Verify sentiment analysis produces valid scores
   - Verify pulse score calculation works
