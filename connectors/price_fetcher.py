@@ -224,12 +224,14 @@ class PriceFetcher:
         "BTC": "bitcoin",
         "ETH": "ethereum",
         "SOL": "solana",
-        "MEME": "memecoin",
+        "MEME": "memecoin-2",  # Correct CoinGecko ID for MEME token
         "DOGE": "dogecoin",
         "SHIB": "shiba-inu",
         "PEPE": "pepe",
         "WIF": "dogwifcoin",
         "BONK": "bonk",
+        "FLOKI": "floki",
+        "TRUMP": "official-trump",
     }
 
     def __init__(
@@ -260,7 +262,20 @@ class PriceFetcher:
         self.rate_limiter = RateLimiter()
 
         # Determine API base URL
-        self.api_base = COINGECKO_PRO_API_BASE if self.api_key else COINGECKO_API_BASE
+        # Demo API keys start with "CG-" and should use the free API endpoint
+        # Pro keys use the pro endpoint
+        if self.api_key and self.api_key.startswith("CG-"):
+            # Demo key - use free API with demo key header
+            self.api_base = COINGECKO_API_BASE
+            self.use_demo_key = True
+        elif self.api_key:
+            # Pro key - use pro API
+            self.api_base = COINGECKO_PRO_API_BASE
+            self.use_demo_key = False
+        else:
+            # No key - use free API without key
+            self.api_base = COINGECKO_API_BASE
+            self.use_demo_key = False
 
         logger.info(
             f"PriceFetcher initialized: coin_id={self.coin_id}, "
@@ -350,10 +365,14 @@ class PriceFetcher:
                 "ids": self.coin_id,
                 "vs_currencies": "usd",
                 "include_24hr_vol": "true",
+                "include_24hr_change": "true",
             }
             headers = {}
             if self.api_key:
-                headers["x-cg-pro-api-key"] = self.api_key
+                if self.use_demo_key:
+                    headers["x-cg-demo-api-key"] = self.api_key
+                else:
+                    headers["x-cg-pro-api-key"] = self.api_key
 
             response = requests.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
@@ -378,6 +397,10 @@ class PriceFetcher:
                 price_usd=coin_data.get("usd", 0.0),
                 volume_24h=coin_data.get("usd_24h_vol", 0.0),
             )
+
+            # Add 24h change if available
+            if "usd_24h_change" in coin_data:
+                price_dict["price_change_24h"] = coin_data["usd_24h_change"]
 
             logger.debug(
                 f"Fetched price for {self.coin_id}: ${price_dict['price_usd']}"
@@ -447,7 +470,10 @@ class PriceFetcher:
             }
             headers = {}
             if self.api_key:
-                headers["x-cg-pro-api-key"] = self.api_key
+                if self.use_demo_key:
+                    headers["x-cg-demo-api-key"] = self.api_key
+                else:
+                    headers["x-cg-pro-api-key"] = self.api_key
 
             response = requests.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()

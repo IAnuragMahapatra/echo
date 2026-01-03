@@ -164,26 +164,26 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
     - Alternative to polling for live updates
     - _Requirements: 11.1_
 
-- [ ] 13. Phrase Clustering (Phase 3)
-  - [ ] 13.1 Create transforms/phrase_clusterer.py
+- [x] 13. Phrase Clustering (Phase 3)
+  - [x] 13.1 Create transforms/phrase_clusterer.py
     - Extract bigrams and trigrams using simple tokenization
     - Filter stopwords and short words (< 3 chars)
     - _Requirements: 5.1_
-  - [ ] 13.2 Add trending phrase tracking to pipeline
+  - [x] 13.2 Add trending phrase tracking to pipeline
     - Use pw.temporal.sliding() with 10-min window
     - Use pw.groupby() and pw.reducers.count() for frequency
     - Mark phrases with frequency >= 5 as trending
     - _Requirements: 5.2, 5.3, 5.4_
 
-- [ ] 14. Influencer Tracking (Phase 3)
-  - [ ] 14.1 Create transforms/influence.py with influence score calculation
+- [x] 14. Influencer Tracking (Phase 3)
+  - [x] 14.1 Create transforms/influence.py with influence score calculation
     - Formula: (followers × 0.6) + (engagement × 0.4)
     - Use pw.apply() to add influence_score to message stream
     - _Requirements: 6.1_
-  - [ ] 14.2 Add influencer classification to pipeline
+  - [x] 14.2 Add influencer classification to pipeline
     - Use pw.Table.filter() to classify authors with score > 10000 as influencers
     - _Requirements: 6.2_
-  - [ ] 14.3 Add influencer consensus tracking
+  - [x] 14.3 Add influencer consensus tracking
     - Use pw.temporal.tumbling() with 10-min windows
     - Track bullish (sentiment > 0.3) vs bearish (sentiment < -0.3) counts
     - Calculate ratio: bullish_count / (bullish_count + bearish_count)

@@ -7,8 +7,8 @@ Contains transformation components for the Pathway streaming pipeline:
 - Price Pipeline: Price delta calculation over sliding windows
 - Divergence Detection: Sentiment-price divergence detection
 - PulseScoreCalculator: Combined momentum scoring (1-10)
-- (Future) PhraseClusterer: N-gram extraction and trending detection
-- (Future) InfluenceCalculator: Author influence scoring
+- PhraseClusterer: N-gram extraction and trending detection
+- InfluenceCalculator: Author influence scoring
 """
 
 from transforms.divergence import (
@@ -25,6 +25,22 @@ from transforms.divergence import (
 )
 from transforms.divergence import (
     DivergenceType as DivergenceTypeEnum,
+)
+from transforms.influence import (
+    InfluenceCalculator,
+    InfluencerConsensus,
+    InfluenceResult,
+    calculate_consensus,
+    calculate_influence_score,
+    get_influence_calculator,
+    is_influencer,
+)
+from transforms.phrase_clusterer import (
+    PhraseClusterer,
+    PhraseResult,
+    extract_phrases,
+    get_phrase_clusterer,
+    get_trending_phrases,
 )
 from transforms.pulse_score import (
     DivergenceType,
@@ -60,6 +76,20 @@ __all__ = [
     "is_aligned",
     "is_bearish_divergence",
     "is_bullish_divergence",
+    # Phrase Clusterer
+    "PhraseClusterer",
+    "PhraseResult",
+    "extract_phrases",
+    "get_phrase_clusterer",
+    "get_trending_phrases",
+    # Influence Calculator
+    "InfluenceCalculator",
+    "InfluenceResult",
+    "InfluencerConsensus",
+    "calculate_influence_score",
+    "is_influencer",
+    "calculate_consensus",
+    "get_influence_calculator",
 ]
 
 # Pathway-dependent imports (only available when pathway is installed)

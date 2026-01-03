@@ -234,7 +234,8 @@ _Hype cycle simulation in progress..._"""
 *What this means:*
 {meaning}
 
-_Demo complete! In production, this runs 24/7 with real social media data._
+⏩ _This demo simulated weeks of market activity in seconds to show the tracker across various conditions._
+_In production, this runs 24/7 with real social media data._
 ⚠️ _Not financial advice - always DYOR!_"""
 
         return await self.send_message(message)
@@ -291,9 +292,11 @@ async def run_demo_with_telegram(use_telegram: bool = True):
                 # Send start message
                 await telegram_bot.send_message(
                     f"🚀 *Crypto Pulse Demo Starting*\n\n"
-                    f"Tracking: *${coin_symbol}*\n"
-                    f"Simulating hype cycle phases...\n\n"
-                    f"_Watch for alerts!_"
+                    f"Tracking: *${coin_symbol}*\n\n"
+                    f"⏩ *What you're about to see:*\n"
+                    f"We're simulating weeks/months of market activity in just a few seconds! "
+                    f"This rapid simulation shows how the tracker behaves across different market conditions.\n\n"
+                    f"_Watch for alerts as momentum shifts!_"
                 )
                 print("  📤 Sent start notification to Telegram")
         else:
@@ -313,6 +316,8 @@ This demo simulates a complete crypto hype cycle showing:
 • Pulse score calculation (1-10 momentum indicator)
 • Price-sentiment divergence detection
 • {telegram_status} for trading signals
+
+⏩ Simulating weeks of market activity at rapid speed!
     """)
 
     # Initialize components
@@ -326,20 +331,41 @@ This demo simulates a complete crypto hype cycle showing:
     # Track metrics
     all_results = []
 
-    # Get trending phrases for the simulation
-    trending_phrases = [
-        "to the moon",
-        "bullish af",
-        "lfg",
-        "100x potential",
-        "hidden gem",
-    ]
+    # Demo-specific phase configs to ensure full range of pulse scores
+    # These override the simulator defaults to show the system in various conditions
+    demo_phase_configs = {
+        "seed": {
+            "sentiment_boost": -0.2,  # Start low/cautious
+            "phrase_freq": 3,
+            "influencer_ratio": 0.2,
+            "price_delta": -5.0,
+        },
+        "growth": {
+            "sentiment_boost": 0.3,  # Building excitement
+            "phrase_freq": 18,
+            "influencer_ratio": 0.6,
+            "price_delta": 25.0,
+        },
+        "peak": {
+            "sentiment_boost": 0.5,  # Maximum hype
+            "phrase_freq": 30,
+            "influencer_ratio": 0.85,
+            "price_delta": 15.0,
+        },
+        "decline": {
+            "sentiment_boost": -0.4,  # Fear/capitulation
+            "phrase_freq": 5,
+            "influencer_ratio": 0.15,
+            "price_delta": -20.0,
+        },
+    }
 
     print_header(f"📊 HYPE CYCLE SIMULATION: ${coin_symbol}")
 
     for phase_idx, phase_name in enumerate(PHASE_ORDER):
         phase_config = PHASES[phase_name]
-        base_price, price_delta = get_phase_price_trend(phase_name)
+        demo_config = demo_phase_configs[phase_name]
+        price_delta = demo_config["price_delta"]
 
         # Phase header with emoji
         phase_emoji = {"seed": "🌱", "growth": "📈", "peak": "🔥", "decline": "📉"}
@@ -361,6 +387,8 @@ This demo simulates a complete crypto hype cycle showing:
         for i in range(messages_per_phase):
             message = generate_single_message(coin_symbol=coin_symbol, phase=phase_name)
             sentiment = sentiment_analyzer.analyze(message["text"])
+            # Apply demo boost to ensure wider range
+            sentiment = max(-1.0, min(1.0, sentiment + demo_config["sentiment_boost"]))
             sentiments.append(sentiment)
 
             is_influencer = message["author_followers"] > 10000
@@ -381,13 +409,9 @@ This demo simulates a complete crypto hype cycle showing:
         max_sentiment = max(sentiments)
         min_sentiment = min(sentiments)
 
-        # Simulate phrase frequency based on phase
-        phrase_freq = {"seed": 5, "growth": 15, "peak": 25, "decline": 8}[phase_name]
-
-        # Calculate influencer ratio
-        influencer_ratio = 0.3 + (influencer_count / messages_per_phase) * 0.5
-        if phase_name == "peak":
-            influencer_ratio = min(0.8, influencer_ratio + 0.2)
+        # Use demo config for phrase frequency and influencer ratio
+        phrase_freq = demo_config["phrase_freq"]
+        influencer_ratio = demo_config["influencer_ratio"]
 
         # Detect divergence
         divergence = detect_divergence(avg_sentiment, price_delta)
