@@ -29,12 +29,12 @@ apt install -y git
 
 # Create app directory
 echo "Creating app directory..."
-mkdir -p /opt/crypto-pulse
-cd /opt/crypto-pulse
+mkdir -p /opt/echo
+cd /opt/echo
 
 # Clone repository (replace with your repo URL)
 echo "Clone your repository:"
-echo "git clone https://github.com/YOUR_USERNAME/crypto-pulse.git ."
+echo "git clone https://github.com/YOUR_USERNAME/echo.git ."
 echo ""
 read -p "Press Enter after cloning your repo..."
 
@@ -61,19 +61,19 @@ WEBHOOK_PORT=8080
 EOF
 
 echo "Edit .env with your actual values:"
-echo "nano /opt/crypto-pulse/.env"
+echo "nano /opt/echo/.env"
 read -p "Press Enter after editing .env..."
 
 # Setup Nginx
 echo "Setting up Nginx..."
-cp deploy/nginx.conf /etc/nginx/sites-available/crypto-pulse
+cp deploy/nginx.conf /etc/nginx/sites-available/echo
 
 # Update domain in nginx config
 read -p "Enter your API domain (e.g., api.yourdomain.com): " API_DOMAIN
-sed -i "s/api.yourdomain.com/$API_DOMAIN/g" /etc/nginx/sites-available/crypto-pulse
+sed -i "s/api.yourdomain.com/$API_DOMAIN/g" /etc/nginx/sites-available/echo
 
 # Enable site
-ln -sf /etc/nginx/sites-available/crypto-pulse /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/echo /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
 # Test nginx config
@@ -85,7 +85,7 @@ systemctl enable nginx
 
 # Create systemd service for the app
 echo "Creating systemd service..."
-cat > /etc/systemd/system/crypto-pulse.service << 'EOF'
+cat > /etc/systemd/system/echo.service << 'EOF'
 [Unit]
 Description=Crypto Pulse Tracker
 After=docker.service
@@ -93,7 +93,7 @@ Requires=docker.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/crypto-pulse
+WorkingDirectory=/opt/echo
 ExecStart=/usr/bin/docker compose up
 ExecStop=/usr/bin/docker compose down
 Restart=always
@@ -105,8 +105,8 @@ EOF
 
 # Enable and start service
 systemctl daemon-reload
-systemctl enable crypto-pulse
-systemctl start crypto-pulse
+systemctl enable echo
+systemctl start echo
 
 echo ""
 echo "=== Setup Complete! ==="
@@ -118,6 +118,6 @@ echo "3. In Cloudflare: SSL/TLS → Full (strict) or Flexible"
 echo "4. Test: curl http://$API_DOMAIN/health"
 echo ""
 echo "Useful commands:"
-echo "  View logs:     journalctl -u crypto-pulse -f"
-echo "  Restart:       systemctl restart crypto-pulse"
-echo "  Docker logs:   cd /opt/crypto-pulse && docker compose logs -f"
+echo "  View logs:     journalctl -u echo -f"
+echo "  Restart:       systemctl restart echo"
+echo "  Docker logs:   cd /opt/echo && docker compose logs -f"

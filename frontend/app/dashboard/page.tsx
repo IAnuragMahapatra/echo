@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -55,6 +55,18 @@ export default function Dashboard() {
 
   const [coinMenuOpen, setCoinMenuOpen] = useState(false);
   const lastScoreRef = useRef<number | null>(null);
+
+  // Influencer sentiment state for correlation display
+  const [influencerSentiment, setInfluencerSentiment] = useState({
+    avg: 0,
+    bullishCount: 0,
+    bearishCount: 0,
+  });
+
+  // Callback for influencer sentiment changes
+  const handleInfluencerSentimentChange = useCallback((avg: number, bullish: number, bearish: number) => {
+    setInfluencerSentiment({ avg, bullishCount: bullish, bearishCount: bearish });
+  }, []);
 
   /* ---------------- Pulse Loop ---------------- */
   useEffect(() => {
@@ -240,7 +252,12 @@ export default function Dashboard() {
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1 flex flex-col gap-7">
           {/* Influencer Leaderboard (Task 18.2 - Requirement 11.3) */}
-          <InfluencerLeaderboard limit={5} refreshInterval={5000} />
+          <InfluencerLeaderboard
+            limit={5}
+            refreshInterval={5000}
+            pulseScore={metrics.score}
+            onSentimentChange={handleInfluencerSentimentChange}
+          />
 
           <div className="glass-panel rounded-2xl p-6 h-[420px] relative group flex flex-col">
             <button

@@ -94,20 +94,20 @@ sudo apt install -y nginx git
 
 # Clone your repo
 cd /opt
-sudo git clone https://github.com/YOUR_USERNAME/crypto-pulse.git
-cd crypto-pulse
+sudo git clone https://github.com/YOUR_USERNAME/echo.git
+cd echo
 
 # Create .env
 sudo nano .env
 # Add your environment variables
 
 # Copy nginx config
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/crypto-pulse
-sudo nano /etc/nginx/sites-available/crypto-pulse
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/echo
+sudo nano /etc/nginx/sites-available/echo
 # Update server_name to your domain
 
 # Enable nginx site
-sudo ln -s /etc/nginx/sites-available/crypto-pulse /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/echo /etc/nginx/sites-enabled/
 sudo rm /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
@@ -168,7 +168,7 @@ open https://yourdomain.com
 
 ```bash
 # View app logs
-cd /opt/crypto-pulse && docker compose logs -f
+cd /opt/echo && docker compose logs -f
 
 # Restart app
 docker compose restart
@@ -187,7 +187,7 @@ sudo nginx -t && sudo systemctl reload nginx
 ### Update Deployment
 
 ```bash
-cd /opt/crypto-pulse
+cd /opt/echo
 git pull
 docker compose down
 docker compose up -d --build

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Users, TrendingUp, TrendingDown, Minus, Crown, Star } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Users, TrendingUp, TrendingDown, Minus, Crown, Star, Activity } from "lucide-react";
 
 interface Influencer {
   author_id: string;
@@ -16,15 +16,38 @@ interface Influencer {
 interface InfluencerLeaderboardProps {
   limit?: number;
   refreshInterval?: number;
+  pulseScore?: number;  // Connect to dashboard pulse score
+  onSentimentChange?: (avgSentiment: number, bullishCount: number, bearishCount: number) => void;
 }
 
 export default function InfluencerLeaderboard({
   limit = 10,
   refreshInterval = 5000,
+  pulseScore = 5.0,
+  onSentimentChange,
 }: InfluencerLeaderboardProps) {
   const [influencers, setInfluencers] = useState<Influencer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Calculate aggregate sentiment metrics
+  const sentimentMetrics = useMemo(() => {
+    if (influencers.length === 0) return { avg: 0, bullish: 0, bearish: 0, neutral: 0 };
+
+    const bullish = influencers.filter(i => i.sentiment > 0.3).length;
+    const bearish = influencers.filter(i => i.sentiment < -0.3).length;
+    const neutral = influencers.length - bullish - bearish;
+    const avg = influencers.reduce((sum, i) => sum + i.sentiment, 0) / influencers.length;
+
+    return { avg, bullish, bearish, neutral };
+  }, [influencers]);
+
+  // Notify parent of sentiment changes
+  useEffect(() => {
+    if (onSentimentChange && influencers.length > 0) {
+      onSentimentChange(sentimentMetrics.avg, sentimentMetrics.bullish, sentimentMetrics.bearish);
+    }
+  }, [sentimentMetrics, onSentimentChange, influencers.length]);
 
   useEffect(() => {
     const fetchInfluencers = async () => {
@@ -46,9 +69,9 @@ export default function InfluencerLeaderboard({
         setInfluencers(data.influencers || []);
         setError(null);
       } catch {
-        // Silently fall back to simulated data when backend unavailable
+        // Fall back to simulated data that correlates with pulse score
         setError("Demo Data");
-        setInfluencers(getSimulatedInfluencers(limit));
+        setInfluencers(getSimulatedInfluencers(limit, pulseScore));
       } finally {
         setLoading(false);
       }
@@ -57,7 +80,7 @@ export default function InfluencerLeaderboard({
     fetchInfluencers();
     const interval = setInterval(fetchInfluencers, refreshInterval);
     return () => clearInterval(interval);
-  }, [limit, refreshInterval]);
+  }, [limit, refreshInterval, pulseScore]);
 
   const getSentimentIcon = (sentiment: number) => {
     if (sentiment > 0.3) return <TrendingUp className="w-4 h-4 text-emerald-400" />;
@@ -92,6 +115,21 @@ export default function InfluencerLeaderboard({
     return <span className="w-5 h-5 text-center text-sm text-muted-foreground">{index + 1}</span>;
   };
 
+  // Determine consensus alignment with pulse score
+  const consensusAlignment = useMemo(() => {
+    const pulseBullish = pulseScore > 6.5;
+    const pulseBearish = pulseScore < 3.5;
+    const influencerBullish = sentimentMetrics.avg > 0.2;
+    const influencerBearish = sentimentMetrics.avg < -0.2;
+
+    if ((pulseBullish && influencerBullish) || (pulseBearish && influencerBearish)) {
+      return "aligned";
+    } else if ((pulseBullish && influencerBearish) || (pulseBearish && influencerBullish)) {
+      return "divergent";
+    }
+    return "neutral";
+  }, [pulseScore, sentimentMetrics.avg]);
+
   if (loading) {
     return (
       <div className="glass-panel rounded-2xl p-6 animate-pulse">
@@ -119,9 +157,44 @@ export default function InfluencerLeaderboard({
             Influencer Leaderboard
           </h3>
         </div>
-        {error && (
-          <span className="text-xs text-yellow-400/60">Demo Data</span>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Sentiment summary badge */}
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+            consensusAlignment === "aligned" ? "bg-emerald-400/20 text-emerald-400" :
+            consensusAlignment === "divergent" ? "bg-red-400/20 text-red-400" :
+            "bg-yellow-400/20 text-yellow-400"
+          }`}>
+            <Activity className="w-3 h-3" />
+            {consensusAlignment === "aligned" ? "Aligned" :
+             consensusAlignment === "divergent" ? "Divergent" : "Mixed"}
+          </div>
+          {error && (
+            <span className="text-xs text-yellow-400/60">Demo</span>
+          )}
+        </div>
+      </div>
+
+      {/* Sentiment breakdown bar */}
+      <div className="mb-4">
+        <div className="flex h-2 rounded-full overflow-hidden bg-white/5">
+          <div
+            className="bg-emerald-400 transition-all duration-500"
+            style={{ width: `${(sentimentMetrics.bullish / Math.max(influencers.length, 1)) * 100}%` }}
+          />
+          <div
+            className="bg-yellow-400 transition-all duration-500"
+            style={{ width: `${(sentimentMetrics.neutral / Math.max(influencers.length, 1)) * 100}%` }}
+          />
+          <div
+            className="bg-red-400 transition-all duration-500"
+            style={{ width: `${(sentimentMetrics.bearish / Math.max(influencers.length, 1)) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+          <span className="text-emerald-400">{sentimentMetrics.bullish} Bullish</span>
+          <span className="text-yellow-400">{sentimentMetrics.neutral} Neutral</span>
+          <span className="text-red-400">{sentimentMetrics.bearish} Bearish</span>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -180,8 +253,8 @@ export default function InfluencerLeaderboard({
   );
 }
 
-// Simulated data for demo/fallback
-function getSimulatedInfluencers(limit: number): Influencer[] {
+// Simulated data for demo/fallback - correlates with pulse score
+function getSimulatedInfluencers(limit: number, pulseScore: number = 5.0): Influencer[] {
   const influencers = [
     { author_id: "crypto_whale_1", followers: 500000, base_engagement: 15000 },
     { author_id: "degen_trader_2", followers: 250000, base_engagement: 8000 },
@@ -195,10 +268,17 @@ function getSimulatedInfluencers(limit: number): Influencer[] {
     { author_id: "gem_finder_10", followers: 45000, base_engagement: 1500 },
   ];
 
-  return influencers.slice(0, limit).map((inf) => {
+  // Bias sentiment based on pulse score (higher pulse = more bullish influencers)
+  const sentimentBias = (pulseScore - 5) / 10; // -0.5 to +0.5 bias
+
+  return influencers.slice(0, limit).map((inf, index) => {
     const engagement = inf.base_engagement + Math.floor(Math.random() * 1000 - 500);
     const influence_score = inf.followers * 0.6 + engagement * 0.4;
-    const sentiment = Math.random() * 1.3 - 0.5; // Range: -0.5 to 0.8
+
+    // Top influencers tend to align with market sentiment more
+    const alignmentFactor = index < 3 ? 0.6 : 0.3;
+    const baseSentiment = Math.random() * 1.3 - 0.5; // Range: -0.5 to 0.8
+    const sentiment = Math.max(-1, Math.min(1, baseSentiment + sentimentBias * alignmentFactor));
 
     return {
       author_id: inf.author_id,

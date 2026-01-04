@@ -31,13 +31,13 @@ DATA_PERSISTENCE=memory
 After deploy:
 
 - Settings → Networking → Generate Domain
-- You'll get something like: `crypto-pulse-production.up.railway.app`
+- You'll get something like: `echo-production.up.railway.app`
 
 ## Update Frontend
 
 In Vercel, set:
 
 ```
-NEXT_PUBLIC_API_URL=https://crypto-pulse-production.up.railway.app
-NEXT_PUBLIC_WS_URL=wss://crypto-pulse-production.up.railway.app
+NEXT_PUBLIC_API_URL=https://echo-production.up.railway.app
+NEXT_PUBLIC_WS_URL=wss://echo-production.up.railway.app
 ```
