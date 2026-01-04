@@ -5,17 +5,175 @@ Extends the Pathway RAG template's question answerer with:
 - Context-enriched prompts using live metrics (pulse_score, trending_phrases, etc.)
 - Retrieval of top 15 relevant messages
 - Ollama integration for local LLM inference
+- Relevance score logging for monitoring query quality (Requirement 12.5)
 
-Requirements: 8.3, 8.4
+Requirements: 8.3, 8.4, 12.5
 """
 
 import logging
+import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Optional
 
 from rag.live_metrics import LiveMetrics, get_live_metrics
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# RAG RELEVANCE SCORE LOGGING (Requirement 12.5)
+# =============================================================================
+
+
+@dataclass
+class RAGQueryLog:
+    """Log entry for a RAG query with relevance scores."""
+
+    query: str
+    timestamp: str
+    relevance_scores: list[float]
+    avg_relevance: float
+    min_relevance: float
+    max_relevance: float
+    num_results: int
+    latency_ms: float
+    pulse_score: float
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "query": self.query,
+            "timestamp": self.timestamp,
+            "relevance_scores": self.relevance_scores,
+            "avg_relevance": self.avg_relevance,
+            "min_relevance": self.min_relevance,
+            "max_relevance": self.max_relevance,
+            "num_results": self.num_results,
+            "latency_ms": self.latency_ms,
+            "pulse_score": self.pulse_score,
+        }
+
+
+class RAGRelevanceLogger:
+    """
+    Logger for RAG retrieval relevance scores.
+
+    Tracks and logs relevance scores for monitoring query quality.
+
+    Requirements: 12.5
+    """
+
+    def __init__(self, max_logs: int = 1000):
+        self.max_logs = max_logs
+        self._logs: list[RAGQueryLog] = []
+        self._total_queries = 0
+        self._total_avg_relevance = 0.0
+
+    def log_query(
+        self,
+        query: str,
+        relevance_scores: list[float],
+        latency_ms: float,
+        pulse_score: float,
+    ) -> RAGQueryLog:
+        """
+        Log a RAG query with its relevance scores.
+
+        Args:
+            query: The user's query
+            relevance_scores: List of relevance scores from retrieval
+            latency_ms: Query latency in milliseconds
+            pulse_score: Current pulse score at time of query
+
+        Returns:
+            RAGQueryLog entry
+        """
+        if relevance_scores:
+            avg_relevance = sum(relevance_scores) / len(relevance_scores)
+            min_relevance = min(relevance_scores)
+            max_relevance = max(relevance_scores)
+        else:
+            avg_relevance = 0.0
+            min_relevance = 0.0
+            max_relevance = 0.0
+
+        log_entry = RAGQueryLog(
+            query=query[:200],  # Truncate long queries
+            timestamp=datetime.utcnow().isoformat() + "Z",
+            relevance_scores=relevance_scores[:10],  # Keep top 10 scores
+            avg_relevance=avg_relevance,
+            min_relevance=min_relevance,
+            max_relevance=max_relevance,
+            num_results=len(relevance_scores),
+            latency_ms=latency_ms,
+            pulse_score=pulse_score,
+        )
+
+        # Update running statistics
+        self._total_queries += 1
+        self._total_avg_relevance = (
+            self._total_avg_relevance * (self._total_queries - 1) + avg_relevance
+        ) / self._total_queries
+
+        # Add to logs
+        self._logs.append(log_entry)
+
+        # Prune old logs if needed
+        if len(self._logs) > self.max_logs:
+            self._logs = self._logs[-self.max_logs :]
+
+        # Log to standard logger
+        logger.info(
+            f"RAG Query: '{query[:50]}...' | "
+            f"Results: {len(relevance_scores)} | "
+            f"Avg Relevance: {avg_relevance:.3f} | "
+            f"Latency: {latency_ms:.1f}ms"
+        )
+
+        # Log warning for low relevance
+        if avg_relevance < 0.3 and relevance_scores:
+            logger.warning(
+                f"Low relevance scores for query: '{query[:50]}...' | "
+                f"Avg: {avg_relevance:.3f}"
+            )
+
+        return log_entry
+
+    def get_recent_logs(self, count: int = 100) -> list[dict]:
+        """Get recent query logs."""
+        return [log.to_dict() for log in self._logs[-count:]]
+
+    def get_statistics(self) -> dict[str, Any]:
+        """Get overall statistics for RAG queries."""
+        if not self._logs:
+            return {
+                "total_queries": 0,
+                "avg_relevance": 0.0,
+                "avg_latency_ms": 0.0,
+                "low_relevance_count": 0,
+            }
+
+        latencies = [log.latency_ms for log in self._logs]
+        low_relevance_count = sum(1 for log in self._logs if log.avg_relevance < 0.3)
+
+        return {
+            "total_queries": self._total_queries,
+            "avg_relevance": self._total_avg_relevance,
+            "avg_latency_ms": sum(latencies) / len(latencies),
+            "low_relevance_count": low_relevance_count,
+            "recent_queries": len(self._logs),
+        }
+
+
+# Global RAG relevance logger
+_rag_logger: Optional[RAGRelevanceLogger] = None
+
+
+def get_rag_logger() -> RAGRelevanceLogger:
+    """Get the global RAG relevance logger (singleton)."""
+    global _rag_logger
+    if _rag_logger is None:
+        _rag_logger = RAGRelevanceLogger()
+    return _rag_logger
 
 
 # =============================================================================
@@ -344,13 +502,15 @@ class CryptoRAG:
         Returns:
             RAGResponse with answer and metadata
 
-        Requirements: 8.3, 8.4
+        Requirements: 8.3, 8.4, 12.5
 
         Example:
             >>> response = rag.answer("What's the current sentiment on $MEME?")
             >>> print(response.answer)
             >>> print(f"Pulse Score: {response.pulse_score}")
         """
+        start_time = time.time()
+
         # Step 1: Retrieve relevant messages (Requirement 8.3)
         messages, scores = self.retrieve_messages(query)
 
@@ -363,7 +523,17 @@ class CryptoRAG:
         # Step 4: Get current metrics snapshot
         snapshot = self.live_metrics.get_snapshot()
 
-        # Step 5: Build response object
+        # Step 5: Calculate latency and log relevance scores (Requirement 12.5)
+        latency_ms = (time.time() - start_time) * 1000
+        rag_logger = get_rag_logger()
+        rag_logger.log_query(
+            query=query,
+            relevance_scores=scores,
+            latency_ms=latency_ms,
+            pulse_score=snapshot["pulse_score"],
+        )
+
+        # Step 6: Build response object
         return RAGResponse(
             answer=answer,
             pulse_score=snapshot["pulse_score"],

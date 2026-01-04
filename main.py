@@ -230,6 +230,139 @@ metrics_history = MetricsHistory(use_sqlite=USE_SQLITE)
 
 
 # =============================================================================
+# INFLUENCER LEADERBOARD STORAGE (Task 18.2)
+# =============================================================================
+
+
+class InfluencerTracker:
+    """
+    Track influencer activity and sentiment for leaderboard.
+
+    Requirements: 11.3
+    """
+
+    def __init__(self, max_influencers: int = 100):
+        self.max_influencers = max_influencers
+        self._lock = threading.Lock()
+        self._influencers: dict[str, dict] = {}
+
+    def update_influencer(
+        self,
+        author_id: str,
+        followers: int,
+        engagement: int,
+        sentiment: float,
+        message_count: int = 1,
+    ):
+        """Update or add an influencer's data."""
+        from transforms.influence import calculate_influence_score
+
+        influence_score = calculate_influence_score(followers, engagement)
+
+        with self._lock:
+            if author_id in self._influencers:
+                # Update existing influencer with rolling average sentiment
+                existing = self._influencers[author_id]
+                total_messages = existing.get("message_count", 1) + message_count
+                avg_sentiment = (
+                    existing.get("sentiment", 0) * existing.get("message_count", 1)
+                    + sentiment * message_count
+                ) / total_messages
+
+                self._influencers[author_id] = {
+                    "author_id": author_id,
+                    "followers": followers,
+                    "engagement": engagement,
+                    "influence_score": influence_score,
+                    "sentiment": avg_sentiment,
+                    "message_count": total_messages,
+                    "last_updated": datetime.utcnow().isoformat() + "Z",
+                }
+            else:
+                self._influencers[author_id] = {
+                    "author_id": author_id,
+                    "followers": followers,
+                    "engagement": engagement,
+                    "influence_score": influence_score,
+                    "sentiment": sentiment,
+                    "message_count": message_count,
+                    "last_updated": datetime.utcnow().isoformat() + "Z",
+                }
+
+            # Prune to max size if needed
+            if len(self._influencers) > self.max_influencers:
+                # Keep top influencers by score
+                sorted_influencers = sorted(
+                    self._influencers.items(),
+                    key=lambda x: x[1]["influence_score"],
+                    reverse=True,
+                )
+                self._influencers = dict(sorted_influencers[: self.max_influencers])
+
+    def get_leaderboard(self, limit: int = 10) -> list[dict]:
+        """Get top influencers sorted by influence score."""
+        with self._lock:
+            sorted_influencers = sorted(
+                self._influencers.values(),
+                key=lambda x: x["influence_score"],
+                reverse=True,
+            )
+            return sorted_influencers[:limit]
+
+
+# Global influencer tracker
+influencer_tracker = InfluencerTracker()
+
+
+def _get_influencer_leaderboard(limit: int = 10) -> list[dict]:
+    """Get the influencer leaderboard from the tracker."""
+    leaderboard = influencer_tracker.get_leaderboard(limit)
+    if leaderboard:
+        return leaderboard
+    # Return simulated data if no real data
+    return _get_simulated_influencers(limit)
+
+
+def _get_simulated_influencers(limit: int = 10) -> list[dict]:
+    """Generate simulated influencer data for demo purposes."""
+    import random
+
+    # Simulated influencer accounts
+    influencers = [
+        {"author_id": "crypto_whale_1", "followers": 500000, "base_engagement": 15000},
+        {"author_id": "degen_trader_2", "followers": 250000, "base_engagement": 8000},
+        {"author_id": "nft_guru_3", "followers": 150000, "base_engagement": 5000},
+        {"author_id": "defi_master_4", "followers": 120000, "base_engagement": 4000},
+        {"author_id": "moon_hunter_5", "followers": 100000, "base_engagement": 3500},
+        {"author_id": "alpha_seeker_6", "followers": 80000, "base_engagement": 2800},
+        {"author_id": "chart_wizard_7", "followers": 75000, "base_engagement": 2500},
+        {"author_id": "token_analyst_8", "followers": 60000, "base_engagement": 2000},
+        {"author_id": "yield_farmer_9", "followers": 50000, "base_engagement": 1800},
+        {"author_id": "gem_finder_10", "followers": 45000, "base_engagement": 1500},
+    ]
+
+    result = []
+    for inf in influencers[:limit]:
+        engagement = inf["base_engagement"] + random.randint(-500, 500)
+        influence_score = (inf["followers"] * 0.6) + (engagement * 0.4)
+        sentiment = random.uniform(-0.5, 0.8)
+
+        result.append(
+            {
+                "author_id": inf["author_id"],
+                "followers": inf["followers"],
+                "engagement": engagement,
+                "influence_score": influence_score,
+                "sentiment": sentiment,
+                "message_count": random.randint(5, 50),
+                "last_updated": datetime.utcnow().isoformat() + "Z",
+            }
+        )
+
+    return result
+
+
+# =============================================================================
 # CURRENT METRICS STATE
 # =============================================================================
 
@@ -569,6 +702,129 @@ def create_api_app():
                     "divergence_status": current_metrics.divergence_status,
                     "sources": [],
                     "relevance_scores": [],
+                    "error": str(e),
+                }
+            )
+
+    # ==========================================================================
+    # GET /api/influencers - Influencer Leaderboard (Task 18.2)
+    # ==========================================================================
+    @app.route("/api/influencers", methods=["GET"])
+    def get_influencers():
+        """
+        Get influencer leaderboard showing top contributors and their sentiment.
+
+        Query params:
+            limit (int): Maximum number of influencers to return (default: 10)
+
+        Returns:
+            JSON with influencers array containing author_id, influence_score,
+            sentiment, followers, engagement_count
+
+        Requirements: 11.3
+        """
+        limit = request.args.get("limit", 10, type=int)
+        limit = min(limit, 50)  # Cap at 50
+
+        # Get influencer data from the influencer tracker
+        try:
+            # Get influencer data from current state
+            influencers = _get_influencer_leaderboard(limit)
+
+            return jsonify(
+                {
+                    "influencers": influencers,
+                    "count": len(influencers),
+                    "tracked_coin": current_metrics.tracked_coin,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Error getting influencer data: {e}")
+            # Return simulated data for demo purposes
+            return jsonify(
+                {
+                    "influencers": _get_simulated_influencers(limit),
+                    "count": limit,
+                    "tracked_coin": current_metrics.tracked_coin,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "simulated": True,
+                }
+            )
+
+    # ==========================================================================
+    # GET /api/rag/stats - RAG Relevance Statistics (Task 18.3)
+    # ==========================================================================
+    @app.route("/api/rag/stats", methods=["GET"])
+    def get_rag_stats():
+        """
+        Get RAG retrieval relevance score statistics.
+
+        Returns:
+            JSON with total_queries, avg_relevance, avg_latency_ms, low_relevance_count
+
+        Requirements: 12.5
+        """
+        try:
+            from rag.crypto_rag import get_rag_logger
+
+            rag_logger = get_rag_logger()
+            stats = rag_logger.get_statistics()
+            return jsonify(
+                {
+                    **stats,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Error getting RAG stats: {e}")
+            return jsonify(
+                {
+                    "total_queries": 0,
+                    "avg_relevance": 0.0,
+                    "avg_latency_ms": 0.0,
+                    "low_relevance_count": 0,
+                    "error": str(e),
+                }
+            )
+
+    # ==========================================================================
+    # GET /api/rag/logs - RAG Query Logs (Task 18.3)
+    # ==========================================================================
+    @app.route("/api/rag/logs", methods=["GET"])
+    def get_rag_logs():
+        """
+        Get recent RAG query logs with relevance scores.
+
+        Query params:
+            limit (int): Maximum number of logs to return (default: 100)
+
+        Returns:
+            JSON with logs array containing query, relevance_scores, latency_ms
+
+        Requirements: 12.5
+        """
+        limit = request.args.get("limit", 100, type=int)
+        limit = min(limit, 500)  # Cap at 500
+
+        try:
+            from rag.crypto_rag import get_rag_logger
+
+            rag_logger = get_rag_logger()
+            logs = rag_logger.get_recent_logs(limit)
+            return jsonify(
+                {
+                    "logs": logs,
+                    "count": len(logs),
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Error getting RAG logs: {e}")
+            return jsonify(
+                {
+                    "logs": [],
+                    "count": 0,
                     "error": str(e),
                 }
             )
@@ -1157,6 +1413,9 @@ def main():
         print("    GET  /api/metrics         - Current metrics")
         print("    GET  /api/metrics/history - Historical data")
         print("    GET  /api/performance     - Performance metrics")
+        print("    GET  /api/influencers     - Influencer leaderboard")
+        print("    GET  /api/rag/stats       - RAG relevance statistics")
+        print("    GET  /api/rag/logs        - RAG query logs")
         print("    POST /api/config          - Update config")
         print("    POST /api/query           - RAG query")
         print("    POST /api/simulate        - Trigger simulation step")

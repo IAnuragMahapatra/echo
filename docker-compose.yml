@@ -1,5 +1,6 @@
 services:
-  # Main Pathway Pipeline
+  # Main Pathway Pipeline & API Server
+  # Requirements: 13.1, 13.2, 13.3, 13.4
   pipeline:
     build:
       context: .
@@ -7,15 +8,22 @@ services:
     container_name: crypto-pulse-pipeline
     ports:
       - "${WEBHOOK_PORT:-8080}:8080"
+      - "${PIPELINE_PORT:-8000}:8000"
     environment:
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
       - TRACKED_COIN=${TRACKED_COIN:-MEME}
       - WEBHOOK_HOST=0.0.0.0
       - WEBHOOK_PORT=8080
+      - PIPELINE_HOST=0.0.0.0
+      - PIPELINE_PORT=8000
       - COINGECKO_API_KEY=${COINGECKO_API_KEY:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - DATA_PERSISTENCE=${DATA_PERSISTENCE:-memory}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
     volumes:
       - ./data:/app/data
+      - pipeline-cache:/app/Cache
     restart: unless-stopped
     networks:
       - crypto-pulse-network
@@ -25,12 +33,74 @@ services:
           "CMD",
           "python",
           "-c",
-          "import requests; requests.get('http://localhost:8080/', timeout=2)",
+          "import requests; requests.get('http://localhost:8000/health', timeout=5)",
         ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+  # Ollama LLM Service (for RAG queries) - Optional
+  # Run with: docker-compose --profile llm up
+  ollama:
+    image: ollama/ollama:latest
+    container_name: crypto-pulse-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - crypto-pulse-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    profiles:
+      - llm
+
+  # Telegram Bot Service
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crypto-pulse-telegram
+    command: python -c "from bot.telegram_bot import TelegramAlertBot; import asyncio; bot = TelegramAlertBot(); asyncio.run(bot.run())"
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID}
+      - TRACKED_COIN=${TRACKED_COIN:-MEME}
+      - PIPELINE_URL=http://pipeline:8000
+    restart: unless-stopped
+    networks:
+      - crypto-pulse-network
+    depends_on:
+      pipeline:
+        condition: service_healthy
+    profiles:
+      - full
+
+  # Frontend Dashboard (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: crypto-pulse-frontend
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:${PIPELINE_PORT:-8000}
+      - NEXT_PUBLIC_WS_URL=ws://localhost:${PIPELINE_PORT:-8000}
+    restart: unless-stopped
+    networks:
+      - crypto-pulse-network
+    depends_on:
+      pipeline:
+        condition: service_healthy
+    profiles:
+      - full
 
   # Hype Simulator (for demos) - run with: docker-compose --profile demo up simulator
   simulator:
@@ -46,11 +116,18 @@ services:
       - SIMULATOR_MESSAGE_COUNT=${SIMULATOR_MESSAGE_COUNT:-200}
     depends_on:
       pipeline:
-        condition: service_started
+        condition: service_healthy
     profiles:
       - demo
     networks:
       - crypto-pulse-network
+
+# Persistent volumes for fault tolerance (Requirement 13.3, 13.4)
+volumes:
+  pipeline-cache:
+    driver: local
+  ollama-models:
+    driver: local
 
 networks:
   crypto-pulse-network:

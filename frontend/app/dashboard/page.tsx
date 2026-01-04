@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   TrendingUp,
   TrendingDown,
-  ChevronDown,
   Maximize2,
 } from "lucide-react";
 
@@ -26,6 +25,7 @@ import PulseScoreHistory from "@/components/PulseScoreHistory";
 import TrendingPhrases from "@/components/TrendingPhrases";
 import PriceStatus from "@/components/PriceStatus";
 import PerformanceStatus from "@/components/PerformanceStatus";
+import InfluencerLeaderboard from "@/components/InfluencerLeaderboard";
 
 import { usePulseData } from "@/hooks/usePulseData";
 import { useScoreHistory } from "@/hooks/useScoreHistory";
@@ -239,15 +239,8 @@ export default function Dashboard() {
       {/* ================= MAIN GRID ================= */}
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="flex-1 flex flex-col gap-7">
-          <div className="glass-panel rounded-2xl min-h-[180px] p-8 relative">
-            <TrendingUp className="absolute top-6 right-6 opacity-10" />
-            <h3 className="text-xs uppercase tracking-widest text-muted-foreground">
-              Influencer Consensus
-            </h3>
-            <div className="text-3xl font-bold mt-2">
-              {metrics.consensus}
-            </div>
-          </div>
+          {/* Influencer Leaderboard (Task 18.2 - Requirement 11.3) */}
+          <InfluencerLeaderboard limit={5} refreshInterval={5000} />
 
           <div className="glass-panel rounded-2xl p-6 h-[420px] relative group flex flex-col">
             <button

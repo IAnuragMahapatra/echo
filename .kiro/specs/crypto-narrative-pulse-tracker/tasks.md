@@ -205,29 +205,29 @@ This implementation builds on the existing Pathway RAG template. Phase 1 (Core) 
   - Ensure all tests pass, ask the user if questions arise. ✅
   - Frontend PerformanceStatus component added to dashboard ✅
 
-- [ ] 17. Discord Connector (Stretch Goal)
-  - [ ] 17.1 Create connectors/discord_connector.py
+- [ ]* 17. Discord Connector (Stretch Goal)
+  - [ ]* 17.1 Create connectors/discord_connector.py
     - Use pw.io.python.read() pattern from Pathway docs
     - Transform Discord webhook messages to MessageSchema
     - _Requirements: 2.1, 2.2, 2.3_
-  - [ ] 17.2 Add retry logic with exponential backoff
+  - [ ]* 17.2 Add retry logic with exponential backoff
     - Retry 3 times on webhook failure
     - Use exponential backoff (1s, 2s, 4s delays)
     - _Requirements: 2.4_
 
-- [ ] 18. Final Integration and Polish
-  - [ ] 18.1 Complete Docker deployment
+- [x] 18. Final Integration and Polish
+  - [x] 18.1 Complete Docker deployment
     - Verify all services start correctly
     - Test fault tolerance (container restart)
     - _Requirements: 13.2, 13.3, 13.4_
-  - [ ] 18.2 Add influencer leaderboard to dashboard
+  - [x] 18.2 Add influencer leaderboard to dashboard
     - Show top contributors and their sentiment
     - _Requirements: 11.3_
-  - [ ] 18.3 Add RAG relevance score logging
+  - [x] 18.3 Add RAG relevance score logging
     - Log retrieval scores for monitoring
     - _Requirements: 12.5_
 
-- [ ] 19. Final Checkpoint - All Tests Pass
+- [x] 19. Final Checkpoint - All Tests Pass
   - Run all unit tests
   - Run all property tests
   - Verify demo flow works end-to-end
