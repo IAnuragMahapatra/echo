@@ -25,12 +25,15 @@ import ChatInterface from "@/components/ChatInterface";
 import PulseScoreHistory from "@/components/PulseScoreHistory";
 import TrendingPhrases from "@/components/TrendingPhrases";
 import PriceStatus from "@/components/PriceStatus";
+import PerformanceStatus from "@/components/PerformanceStatus";
 
 import { usePulseData } from "@/hooks/usePulseData";
 import { useScoreHistory } from "@/hooks/useScoreHistory";
+import { useSimulatedPerformanceData } from "@/hooks/usePerformanceData";
 
 /* ---------------- Coins ---------------- */
 const COINS = [
+  { symbol: "MEME", name: "Memecoin", base: 0.012 },
   { symbol: "BTC", name: "Bitcoin", base: 98420 },
   { symbol: "ETH", name: "Ethereum", base: 4200 },
   { symbol: "SOL", name: "Solana", base: 185 },
@@ -40,6 +43,7 @@ const COINS = [
 export default function Dashboard() {
   const { data, metrics } = usePulseData();
   const { scoreHistory, addScore } = useScoreHistory();
+  const { metrics: perfMetrics } = useSimulatedPerformanceData();
 
   const [expanded, setExpanded] =
     useState<"market" | "chat" | "score" | null>(null);
@@ -100,7 +104,7 @@ export default function Dashboard() {
       </header>
 
       {/* ================= TOP GRID ================= */}
-<div className="grid grid-cols-1 md:grid-cols-4 gap-5 items-stretch">
+<div className="grid grid-cols-1 md:grid-cols-5 gap-5 items-stretch">
   {/* Pulse */}
   <div onClick={() => setExpanded("score")} className="cursor-pointer group relative">
     <PulseGauge score={metrics.score} />
@@ -157,6 +161,14 @@ export default function Dashboard() {
     symbol={coin.symbol}
     price={price}
     divergence={divergence}
+  />
+
+  {/* Performance status */}
+  <PerformanceStatus
+    latencyMs={perfMetrics.latency.avg_ms}
+    throughputMps={perfMetrics.throughput.current_mps}
+    totalMessages={perfMetrics.throughput.total_messages}
+    warningsCount={perfMetrics.latency.warnings_count}
   />
 </div>
 
@@ -368,7 +380,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-      
+
     </main>
   );
 }

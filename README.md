@@ -1,77 +1,92 @@
-![](https://github.com/PSonakshi/echo/blob/main/assets/architecture.jpeg)
-
 # Crypto Narrative Pulse Tracker
 
-Real-time streaming analytics system built on Pathway that processes social media data to generate momentum signals for crypto traders.
+Real-time sentiment analytics for crypto traders. Processes social signals → generates momentum scores (1-10) → sends alerts.
 
-## Quick Start with Docker
+![Architecture](assets/architecture.jpeg)
 
-### Prerequisites
+## Features
 
-- Docker Desktop running
-- `.env` file configured (see `.env.example`)
+- **Pulse Score** - Combines sentiment, trending phrases, influencer signals into 1-10 score
+- **Phrase Clustering** - Detects emerging narratives via bigram/trigram analysis
+- **Influencer Tracking** - Weights signals by follower count and engagement
+- **Divergence Detection** - Alerts when sentiment diverges from price action
+- **RAG Chat** - Query market context with LLM-powered responses
+- **Telegram Alerts** - Real-time notifications for score thresholds
 
-### Run the Pipeline
+## Quick Start
+
+### Docker (Recommended)
 
 ```bash
-# Build and start the pipeline
+# Start pipeline
 docker-compose up pipeline
 
-# In another terminal, send test messages
-python send_test_message.py --count 10 --bullish
-```
-
-### Run with Simulator (Demo Mode)
-
-```bash
-# Start pipeline + simulator together
+# With simulator (demo mode)
 docker-compose --profile demo up
 ```
 
-### Test Endpoints
-
-The pipeline exposes a webhook at `http://localhost:8080/` that accepts POST requests:
+### Local Development (Windows)
 
 ```bash
-# Send a test message using curl
-curl -X POST http://localhost:8080/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message_id": "test_001",
-    "text": "$MEME to the moon! 🚀",
-    "author_id": "user_123",
-    "author_followers": 5000,
-    "timestamp": "2026-01-04T00:00:00Z",
-    "tags": "[\"#MEME\", \"#crypto\"]",
-    "engagement_count": 100,
-    "source_platform": "test"
-  }'
-```
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `TELEGRAM_TOKEN` | Telegram bot token | - |
-| `TELEGRAM_CHANNEL_ID` | Telegram channel (e.g., `@echo_pathway`) | - |
-| `TRACKED_COIN` | Cryptocurrency to track | `MEME` |
-| `WEBHOOK_PORT` | Port for webhook endpoint | `8080` |
-
-## Local Development (Windows)
-
-Since Pathway requires Linux, use the demo modes for local development:
-
-```bash
-# Activate virtual environment
+# Pathway requires Linux - use demo mode locally
 .venv_demo\Scripts\activate
-
-# Run demo mode (simulated Pathway)
 python main.py
-
-# Or run live showcase with LLM
-python showcase_live.py
 ```
 
-## Architecture
+### Frontend
 
-- This is temporary README with a nano banana generated architecture diagram for reference of developers
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/metrics` | GET | Current pulse score, phrases, consensus |
+| `/api/metrics/history` | GET | Historical scores for charting |
+| `/api/performance` | GET | Latency and throughput metrics |
+| `/api/query` | POST | RAG query for market insights |
+| `/` | POST | Webhook for message ingestion |
+
+## Configuration
+
+```bash
+# .env
+TELEGRAM_TOKEN=your_bot_token
+TELEGRAM_CHANNEL_ID=@your_channel
+TRACKED_COIN=MEME
+COINGECKO_API_KEY=CG-xxx  # Optional, demo key
+```
+
+## Project Structure
+
+```
+├── main.py              # API server + demo mode
+├── pipeline.py          # Pathway streaming pipeline
+├── transforms/          # Sentiment, pulse score, clustering
+├── connectors/          # Webhook, price fetcher
+├── bot/                 # Telegram alerts
+├── rag/                 # LLM integration
+├── simulator/           # Hype cycle simulator
+└── frontend/            # Next.js dashboard
+```
+
+## Tech Stack
+
+- **Pathway** - Real-time streaming (Docker only)
+- **VADER + Crypto Lexicon** - Sentiment analysis
+- **CoinGecko API** - Price data
+- **Ollama** - Local LLM for RAG
+- **Next.js** - Dashboard frontend
+- **Telegram Bot API** - Alerts
+
+## Tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+153 tests covering core pipeline, sentiment, pulse score, phrase clustering, influencer tracking, and performance monitoring.

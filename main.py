@@ -4,8 +4,9 @@ Crypto Narrative Pulse Tracker - Main Application
 
 This is the main entry point for the backend server providing:
 1. REST API endpoints for frontend integration
-2. Demo simulation mode with Telegram alerts
-3. Real-time metrics serving
+2. WebSocket support for real-time updates
+3. Demo simulation mode with Telegram alerts
+4. Real-time metrics serving
 
 Usage:
   python main.py                    # Start API server (default port 8000)
@@ -16,18 +17,24 @@ Usage:
 API Endpoints:
   GET  /api/metrics          - Current pulse score and metrics
   GET  /api/metrics/history  - Historical data for charts
-  POST /api/config           - Update tracked coin
+  POST /api/config           - Update tracked coin configuration
   POST /api/query            - RAG query endpoint
+  GET  /api/performance      - Performance metrics (latency/throughput)
   GET  /health               - Health check
+  WS   /ws                   - WebSocket for real-time updates
+
+Requirements: 11.1, 11.2, 11.4
 """
 
 import asyncio
+import logging
 import os
 import sys
+import threading
 import time
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Callable, Optional
 
 # Fix Windows console encoding for emoji support
 if sys.platform == "win32":
@@ -43,6 +50,12 @@ sys.path.insert(0, ".")
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # Mock pathway module for Windows compatibility
 from unittest.mock import MagicMock
@@ -68,35 +81,152 @@ from transforms.sentiment import SentimentAnalyzer
 
 
 class MetricsHistory:
-    """Store historical metrics for charting."""
+    """
+    Store historical metrics for charting.
 
-    def __init__(self, max_hours: int = 48):
+    Supports both in-memory storage (default) and SQLite persistence.
+    Retains last 24-48 hours of data points.
+
+    Requirements: 11.1
+    """
+
+    def __init__(
+        self,
+        max_hours: int = 48,
+        use_sqlite: bool = False,
+        db_path: str = "data/metrics_history.db",
+    ):
         self.max_points = max_hours * 60  # One point per minute
-        self.history = deque(maxlen=self.max_points)
+        self.use_sqlite = use_sqlite
+        self.db_path = db_path
+        self._lock = threading.Lock()
+
+        if use_sqlite:
+            self._init_sqlite()
+        else:
+            self.history = deque(maxlen=self.max_points)
+
+    def _init_sqlite(self):
+        """Initialize SQLite database for persistent storage."""
+        import os
+        import sqlite3
+
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS metrics_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                pulse_score REAL NOT NULL,
+                sentiment REAL NOT NULL,
+                divergence TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_timestamp ON metrics_history(timestamp)"
+        )
+        conn.commit()
+        conn.close()
+        logger.info(f"SQLite metrics history initialized at {self.db_path}")
 
     def add(self, pulse_score: float, sentiment: float, divergence: str):
         """Add a new data point."""
-        self.history.append(
-            {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "pulse_score": pulse_score,
-                "sentiment": sentiment,
-                "divergence": divergence,
-            }
-        )
+        timestamp = datetime.utcnow().isoformat() + "Z"
+
+        with self._lock:
+            if self.use_sqlite:
+                import sqlite3
+
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO metrics_history (timestamp, pulse_score, sentiment, divergence) VALUES (?, ?, ?, ?)",
+                    (timestamp, pulse_score, sentiment, divergence),
+                )
+                # Clean up old entries
+                cutoff = (datetime.utcnow() - timedelta(hours=48)).isoformat()
+                cursor.execute(
+                    "DELETE FROM metrics_history WHERE timestamp < ?", (cutoff,)
+                )
+                conn.commit()
+                conn.close()
+            else:
+                self.history.append(
+                    {
+                        "timestamp": timestamp,
+                        "pulse_score": pulse_score,
+                        "sentiment": sentiment,
+                        "divergence": divergence,
+                    }
+                )
 
     def get_history(self, hours: int = 24) -> list:
         """Get history for the last N hours."""
         cutoff = datetime.utcnow() - timedelta(hours=hours)
-        return [
-            point
-            for point in self.history
-            if datetime.fromisoformat(point["timestamp"].replace("Z", "")) > cutoff
-        ]
+
+        with self._lock:
+            if self.use_sqlite:
+                import sqlite3
+
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT timestamp, pulse_score, sentiment, divergence FROM metrics_history WHERE timestamp > ? ORDER BY timestamp ASC",
+                    (cutoff.isoformat(),),
+                )
+                rows = cursor.fetchall()
+                conn.close()
+                return [
+                    {
+                        "timestamp": row[0],
+                        "pulse_score": row[1],
+                        "sentiment": row[2],
+                        "divergence": row[3],
+                    }
+                    for row in rows
+                ]
+            else:
+                return [
+                    point
+                    for point in self.history
+                    if datetime.fromisoformat(point["timestamp"].replace("Z", ""))
+                    > cutoff
+                ]
+
+    def get_latest(self, count: int = 100) -> list:
+        """Get the latest N data points."""
+        with self._lock:
+            if self.use_sqlite:
+                import sqlite3
+
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT timestamp, pulse_score, sentiment, divergence FROM metrics_history ORDER BY timestamp DESC LIMIT ?",
+                    (count,),
+                )
+                rows = cursor.fetchall()
+                conn.close()
+                return [
+                    {
+                        "timestamp": row[0],
+                        "pulse_score": row[1],
+                        "sentiment": row[2],
+                        "divergence": row[3],
+                    }
+                    for row in reversed(rows)
+                ]
+            else:
+                return list(self.history)[-count:]
 
 
-# Global metrics history
-metrics_history = MetricsHistory()
+# Global metrics history - use SQLite if DATA_PERSISTENCE env var is set
+USE_SQLITE = os.getenv("DATA_PERSISTENCE", "memory").lower() == "sqlite"
+metrics_history = MetricsHistory(use_sqlite=USE_SQLITE)
 
 
 # =============================================================================
@@ -105,9 +235,16 @@ metrics_history = MetricsHistory()
 
 
 class CurrentMetrics:
-    """Current metrics state for API responses."""
+    """
+    Current metrics state for API responses.
+
+    Thread-safe container for real-time metrics.
+
+    Requirements: 11.1, 11.2
+    """
 
     def __init__(self):
+        self._lock = threading.Lock()
         self.pulse_score = 5.0
         self.trending_phrases = []
         self.influencer_consensus = "neutral"
@@ -115,25 +252,65 @@ class CurrentMetrics:
         self.sentiment_velocity = 0.0
         self.tracked_coin = os.getenv("TRACKED_COIN", "MEME")
         self.last_updated = datetime.utcnow()
+        self.message_count = 0
+        self.influencer_bullish_count = 0
+        self.influencer_bearish_count = 0
+        self.current_price = None
+        self.price_delta_pct = 0.0
+
+        # WebSocket subscribers for real-time updates
+        self._subscribers: list[Callable[[dict], None]] = []
 
     def update(self, **kwargs):
-        """Update metrics."""
-        for key, value in kwargs.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-        self.last_updated = datetime.utcnow()
+        """Update metrics (thread-safe)."""
+        with self._lock:
+            for key, value in kwargs.items():
+                if hasattr(self, key) and not key.startswith("_"):
+                    setattr(self, key, value)
+            self.last_updated = datetime.utcnow()
+
+        # Notify WebSocket subscribers
+        self._notify_subscribers()
 
     def to_dict(self) -> dict:
         """Convert to dictionary for API response."""
-        return {
-            "pulse_score": self.pulse_score,
-            "trending_phrases": self.trending_phrases,
-            "influencer_consensus": self.influencer_consensus,
-            "divergence_status": self.divergence_status,
-            "sentiment_velocity": self.sentiment_velocity,
-            "tracked_coin": self.tracked_coin,
-            "timestamp": self.last_updated.isoformat() + "Z",
-        }
+        with self._lock:
+            return {
+                "pulse_score": self.pulse_score,
+                "trending_phrases": self.trending_phrases,
+                "influencer_consensus": self.influencer_consensus,
+                "divergence_status": self.divergence_status,
+                "sentiment_velocity": self.sentiment_velocity,
+                "tracked_coin": self.tracked_coin,
+                "timestamp": self.last_updated.isoformat() + "Z",
+                "message_count": self.message_count,
+                "influencer_bullish_count": self.influencer_bullish_count,
+                "influencer_bearish_count": self.influencer_bearish_count,
+                "current_price": self.current_price,
+                "price_delta_pct": self.price_delta_pct,
+            }
+
+    def subscribe(self, callback: Callable[[dict], None]):
+        """Subscribe to metrics updates for WebSocket push."""
+        with self._lock:
+            self._subscribers.append(callback)
+
+    def unsubscribe(self, callback: Callable[[dict], None]):
+        """Unsubscribe from metrics updates."""
+        with self._lock:
+            if callback in self._subscribers:
+                self._subscribers.remove(callback)
+
+    def _notify_subscribers(self):
+        """Notify all WebSocket subscribers of metrics update."""
+        data = self.to_dict()
+        for callback in self._subscribers[
+            :
+        ]:  # Copy list to avoid modification during iteration
+            try:
+                callback(data)
+            except Exception as e:
+                logger.warning(f"Error notifying subscriber: {e}")
 
 
 # Global current metrics
@@ -146,46 +323,148 @@ current_metrics = CurrentMetrics()
 
 
 def create_api_app():
-    """Create Flask application with API endpoints."""
+    """
+    Create Flask application with API endpoints.
+
+    Endpoints:
+    - GET /api/metrics - Return current pulse score, phrases, divergence, consensus
+    - GET /api/metrics/history - Return historical pulse scores for charting
+    - POST /api/config - Update tracked coin configuration
+    - POST /api/query - Handle RAG queries from frontend
+    - GET /api/performance - Performance metrics (latency/throughput)
+    - GET /health - Health check
+
+    Requirements: 11.1, 11.2, 11.4
+    """
+    from functools import wraps
+
     from flask import Flask, jsonify, request
     from flask_cors import CORS
 
     app = Flask(__name__)
 
-    # Configure CORS
+    # ==========================================================================
+    # CORS Configuration (Task 12.2)
+    # ==========================================================================
     cors_origins = os.getenv(
         "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
     ).split(",")
-    CORS(app, origins=cors_origins)
 
+    # Add production domain if configured
+    production_domain = os.getenv("PRODUCTION_DOMAIN")
+    if production_domain:
+        cors_origins.append(production_domain)
+
+    CORS(app, origins=cors_origins, supports_credentials=True)
+    logger.info(f"CORS configured for origins: {cors_origins}")
+
+    # ==========================================================================
+    # API Key Authentication Middleware (Task 12.2)
+    # ==========================================================================
+    API_KEY = os.getenv("API_KEY")
+    # Note: Protected endpoints use the @require_api_key decorator
+
+    def require_api_key(f):
+        """Decorator to require API key for protected endpoints."""
+
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not API_KEY:
+                # No API key configured, allow all requests
+                return f(*args, **kwargs)
+
+            # Check for API key in header or query param
+            provided_key = request.headers.get("X-API-Key") or request.args.get(
+                "api_key"
+            )
+
+            if provided_key != API_KEY:
+                return jsonify(
+                    {"error": "Unauthorized", "message": "Invalid or missing API key"}
+                ), 401
+
+            return f(*args, **kwargs)
+
+        return decorated
+
+    # ==========================================================================
+    # Health Check Endpoint
+    # ==========================================================================
     @app.route("/health", methods=["GET"])
     def health():
         """Health check endpoint."""
         return jsonify(
-            {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
-        )
-
-    @app.route("/api/metrics", methods=["GET"])
-    def get_metrics():
-        """Get current pulse tracker metrics."""
-        return jsonify(current_metrics.to_dict())
-
-    @app.route("/api/metrics/history", methods=["GET"])
-    def get_metrics_history():
-        """Get historical metrics for charting."""
-        hours = request.args.get("hours", 24, type=int)
-        hours = min(hours, 48)  # Cap at 48 hours
-        return jsonify(
             {
-                "history": metrics_history.get_history(hours),
-                "hours": hours,
+                "status": "healthy",
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "version": "1.0.0",
+                "tracked_coin": current_metrics.tracked_coin,
             }
         )
 
+    # ==========================================================================
+    # GET /api/metrics - Current Metrics (Task 12.1)
+    # ==========================================================================
+    @app.route("/api/metrics", methods=["GET"])
+    def get_metrics():
+        """
+        Get current pulse tracker metrics.
+
+        Returns:
+            JSON with pulse_score, trending_phrases, divergence, consensus, etc.
+
+        Requirements: 11.1, 11.2
+        """
+        return jsonify(current_metrics.to_dict())
+
+    # ==========================================================================
+    # GET /api/metrics/history - Historical Metrics (Task 12.1, 12.3)
+    # ==========================================================================
+    @app.route("/api/metrics/history", methods=["GET"])
+    def get_metrics_history():
+        """
+        Get historical metrics for charting.
+
+        Query params:
+            hours (int): Number of hours of history (default: 24, max: 48)
+            limit (int): Maximum number of data points (default: 1000)
+
+        Returns:
+            JSON with history array and metadata
+
+        Requirements: 11.1
+        """
+        hours = request.args.get("hours", 24, type=int)
+        hours = min(hours, 48)  # Cap at 48 hours
+        limit = request.args.get("limit", 1000, type=int)
+
+        history = metrics_history.get_history(hours)
+
+        # Apply limit if needed
+        if len(history) > limit:
+            # Sample evenly across the time range
+            step = len(history) // limit
+            history = history[::step][:limit]
+
+        return jsonify(
+            {
+                "history": history,
+                "hours": hours,
+                "count": len(history),
+                "tracked_coin": current_metrics.tracked_coin,
+            }
+        )
+
+    # ==========================================================================
+    # GET /api/performance - Performance Metrics (Task 12.1)
+    # ==========================================================================
     @app.route("/api/performance", methods=["GET"])
     def get_performance():
         """
         Get current performance metrics (latency and throughput).
+
+        Returns:
+            JSON with latency and throughput statistics
 
         Requirements: 12.1, 12.2, 12.3
         """
@@ -203,16 +482,41 @@ def create_api_app():
                 }
             )
 
+    # ==========================================================================
+    # GET/POST /api/config - Configuration (Task 12.1)
+    # ==========================================================================
     @app.route("/api/config", methods=["GET", "POST"])
+    @require_api_key
     def config():
-        """Get or update configuration."""
+        """
+        Get or update configuration.
+
+        GET: Returns current configuration
+        POST: Updates tracked coin (requires API key if configured)
+
+        POST body:
+            {"coin": "BTC"}
+
+        Returns:
+            JSON with configuration
+
+        Requirements: 11.1
+        """
         if request.method == "POST":
             data = request.get_json() or {}
             coin = data.get("coin")
             if coin:
+                old_coin = current_metrics.tracked_coin
                 current_metrics.tracked_coin = coin.upper()
                 os.environ["TRACKED_COIN"] = coin.upper()
-                return jsonify({"success": True, "coin": current_metrics.tracked_coin})
+                logger.info(f"Tracked coin changed from {old_coin} to {coin.upper()}")
+                return jsonify(
+                    {
+                        "success": True,
+                        "coin": current_metrics.tracked_coin,
+                        "previous_coin": old_coin,
+                    }
+                )
             return jsonify({"error": "Missing 'coin' field"}), 400
 
         return jsonify(
@@ -220,12 +524,27 @@ def create_api_app():
                 "coin": current_metrics.tracked_coin,
                 "alert_threshold_high": 7.0,
                 "alert_threshold_low": 3.0,
+                "cors_origins": cors_origins,
+                "api_key_required": bool(API_KEY),
             }
         )
 
+    # ==========================================================================
+    # POST /api/query - RAG Query (Task 12.1)
+    # ==========================================================================
     @app.route("/api/query", methods=["POST"])
     def query():
-        """Handle RAG queries."""
+        """
+        Handle RAG queries from frontend.
+
+        POST body:
+            {"question": "What's the sentiment on $MEME?"}
+
+        Returns:
+            JSON with answer, pulse_score, trending_phrases, sources
+
+        Requirements: 11.4
+        """
         data = request.get_json() or {}
         question = data.get("question", "")
 
@@ -239,19 +558,35 @@ def create_api_app():
             response = rag.answer(question)
             return jsonify(response.to_dict())
         except Exception as e:
+            logger.warning(f"RAG query failed: {e}")
             # Fallback response without RAG
             return jsonify(
                 {
-                    "answer": f"RAG system unavailable. Current pulse score is {current_metrics.pulse_score:.1f}/10 for ${current_metrics.tracked_coin}.",
+                    "answer": f"RAG system unavailable. Current pulse score is {current_metrics.pulse_score:.1f}/10 for ${current_metrics.tracked_coin}. Trending phrases: {', '.join(current_metrics.trending_phrases[:3]) if current_metrics.trending_phrases else 'None'}.",
                     "pulse_score": current_metrics.pulse_score,
                     "trending_phrases": current_metrics.trending_phrases,
+                    "influencer_consensus": current_metrics.influencer_consensus,
+                    "divergence_status": current_metrics.divergence_status,
+                    "sources": [],
+                    "relevance_scores": [],
                     "error": str(e),
                 }
             )
 
+    # ==========================================================================
+    # POST /api/simulate - Simulation Step (for testing)
+    # ==========================================================================
     @app.route("/api/simulate", methods=["POST"])
     def simulate():
-        """Trigger a simulation step (for testing)."""
+        """
+        Trigger a simulation step (for testing).
+
+        POST body:
+            {"phase": "growth"}  # Optional, defaults to "growth"
+
+        Returns:
+            JSON with message, sentiment, pulse_score, divergence
+        """
         import time as time_module
 
         data = request.get_json() or {}
@@ -298,6 +633,7 @@ def create_api_app():
             sentiment_velocity=sentiment,
             divergence_status=divergence,
             trending_phrases=PHASES.get(phase, {}).get("phrases", [])[:5],
+            message_count=current_metrics.message_count + 1,
         )
 
         metrics_history.add(pulse_score, sentiment, divergence)
@@ -308,8 +644,21 @@ def create_api_app():
                 "sentiment": sentiment,
                 "pulse_score": pulse_score,
                 "divergence": divergence,
+                "phase": phase,
             }
         )
+
+    # ==========================================================================
+    # Error Handlers
+    # ==========================================================================
+    @app.errorhandler(404)
+    def not_found(e):
+        return jsonify({"error": "Not found", "message": str(e)}), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        logger.error(f"Internal server error: {e}")
+        return jsonify({"error": "Internal server error", "message": str(e)}), 500
 
     return app
 
@@ -684,6 +1033,98 @@ async def run_demo(use_telegram: bool = True):
 # =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
+# WEBSOCKET SUPPORT (Task 12.4)
+# =============================================================================
+
+# Global SocketIO instance
+_socketio = None
+
+
+def create_socketio_app(app):
+    """
+    Create Flask-SocketIO application for real-time WebSocket updates.
+
+    Provides real-time metrics push to frontend clients as an alternative
+    to polling for live updates.
+
+    Requirements: 11.1
+    """
+    global _socketio
+
+    try:
+        from flask_socketio import SocketIO, emit
+
+        cors_origins = os.getenv(
+            "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+        ).split(",")
+
+        _socketio = SocketIO(
+            app,
+            cors_allowed_origins=cors_origins,
+            async_mode="threading",
+            logger=False,
+            engineio_logger=False,
+        )
+
+        @_socketio.on("connect")
+        def handle_connect():
+            """Handle client connection."""
+            logger.info("WebSocket client connected")
+            # Send current metrics immediately on connect
+            emit("metrics_update", current_metrics.to_dict())
+
+        @_socketio.on("disconnect")
+        def handle_disconnect():
+            """Handle client disconnection."""
+            logger.info("WebSocket client disconnected")
+
+        @_socketio.on("subscribe_metrics")
+        def handle_subscribe():
+            """Handle metrics subscription request."""
+            emit("metrics_update", current_metrics.to_dict())
+
+        @_socketio.on("request_history")
+        def handle_history_request(data):
+            """Handle history request from client."""
+            hours = data.get("hours", 24) if data else 24
+            hours = min(hours, 48)
+            history = metrics_history.get_history(hours)
+            emit(
+                "history_update",
+                {
+                    "history": history,
+                    "hours": hours,
+                    "count": len(history),
+                },
+            )
+
+        # Subscribe to metrics updates to broadcast to all clients
+        def broadcast_metrics(data: dict):
+            """Broadcast metrics update to all connected clients."""
+            if _socketio:
+                _socketio.emit("metrics_update", data)
+
+        current_metrics.subscribe(broadcast_metrics)
+
+        logger.info("WebSocket support enabled with Flask-SocketIO")
+        return _socketio
+
+    except ImportError:
+        logger.warning("Flask-SocketIO not installed. WebSocket support disabled.")
+        logger.warning("Install with: pip install flask-socketio")
+        return None
+
+
+def broadcast_metrics_update():
+    """Manually broadcast current metrics to all WebSocket clients."""
+    global _socketio
+    if _socketio:
+        _socketio.emit("metrics_update", current_metrics.to_dict())
+
+
+# =============================================================================
+# MAIN ENTRY POINT
+# =============================================================================
 
 
 def main():
@@ -697,6 +1138,9 @@ def main():
     )
     parser.add_argument("--port", type=int, default=8000, help="API server port")
     parser.add_argument("--host", default="0.0.0.0", help="API server host")
+    parser.add_argument(
+        "--no-websocket", action="store_true", help="Disable WebSocket support"
+    )
 
     args = parser.parse_args()
 
@@ -708,20 +1152,41 @@ def main():
         print_header("🚀 CRYPTO NARRATIVE PULSE TRACKER - API SERVER")
         print(f"\n  Starting server on http://{args.host}:{args.port}")
         print(f"  Tracked coin: ${current_metrics.tracked_coin}")
-        print("\n  Endpoints:")
+        print("\n  REST Endpoints:")
         print("    GET  /health              - Health check")
         print("    GET  /api/metrics         - Current metrics")
         print("    GET  /api/metrics/history - Historical data")
+        print("    GET  /api/performance     - Performance metrics")
         print("    POST /api/config          - Update config")
         print("    POST /api/query           - RAG query")
         print("    POST /api/simulate        - Trigger simulation step")
-        print("\n  Press Ctrl+C to stop\n")
 
         try:
             app = create_api_app()
-            app.run(host=args.host, port=args.port, debug=False)
-        except ImportError:
-            print("  ⚠️ Flask not installed. Install with: pip install flask flask-cors")
+
+            # Try to enable WebSocket support
+            socketio = None
+            if not args.no_websocket:
+                socketio = create_socketio_app(app)
+                if socketio:
+                    print("\n  WebSocket Events:")
+                    print("    connect              - Client connected")
+                    print("    metrics_update       - Real-time metrics push")
+                    print("    subscribe_metrics    - Subscribe to updates")
+                    print("    request_history      - Request historical data")
+
+            print("\n  Press Ctrl+C to stop\n")
+
+            if socketio:
+                # Run with WebSocket support
+                socketio.run(app, host=args.host, port=args.port, debug=False)
+            else:
+                # Run without WebSocket support
+                app.run(host=args.host, port=args.port, debug=False)
+
+        except ImportError as e:
+            print(f"  ⚠️ Missing dependency: {e}")
+            print("  Install with: pip install flask flask-cors flask-socketio")
             sys.exit(1)
 
 

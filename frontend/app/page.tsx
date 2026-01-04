@@ -40,15 +40,15 @@ export default function Page() {
           <h1 className="text-[3.8rem] leading-tight font-medium text-white/80">
             Echo is an
             <br />
-            AI-powered narrative 
+            AI-powered narrative
             <br/>
             intelligence engine
-          
+
             <br />
-            designed for the high-velocity world 
+            designed for the high-velocity world
             <br />
            of cryptocurrency.
-          
+
           </h1>
 
       </div>
@@ -89,7 +89,7 @@ export default function Page() {
   </p>
 
 
-         
+
         </div>
       </section>
 
@@ -115,10 +115,10 @@ export default function Page() {
             </h2>
 
             <p className="text-white/50 max-w-sm">
-            
+
             </p>
 
-            
+
           </div>
 
           <div className="grid grid-cols-3 gap-12">
@@ -180,7 +180,7 @@ export default function Page() {
       {/* ================= FOOTER ================= */}
       <footer className="relative border-t border-white/10 py-12 px-16">
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-emerald-400/5 to-transparent" />
-        
+
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
           {/* LEFT - CGAPI Logo */}
           <div className="flex items-center gap-3">
