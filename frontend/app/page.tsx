@@ -11,22 +11,20 @@ export default function Page() {
         {/* COLOR BANDS */}
         <div className="absolute inset-0 -z-10">
           <div
-            className="absolute right-0 top-0 h-full w-[60%]"
+            className="absolute right-0 top-0 h-full w-[60%] blur-[70px] opacity-100"
             style={{
               background:
                 "linear-gradient(90deg, #16002d, #3b0f70, #7a1cff, #4361ee, #4cc9f0, #80ffdb, #ffd166, #ff7a00, #ff0054)",
-              filter: "blur(70px)",
-              opacity: 1,
             }}
+            suppressHydrationWarning
           />
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 mix-blend-overlay opacity-40"
             style={{
               background:
                 "repeating-linear-gradient(90deg, rgba(255,255,255,0.25) 0px, rgba(255,255,255,0.25) 3px, transparent 3px, transparent 12px)",
-              mixBlendMode: "overlay",
-              opacity: 0.4,
             }}
+            suppressHydrationWarning
           />
           <div className="absolute inset-0 bg-gradient-to-l from-black via-black/40 to-black" />
         </div>
@@ -57,13 +55,12 @@ export default function Page() {
       {/* ================= ANNOUNCEMENT ================= */}
       <section className="relative py-48 flex justify-center">
         <div
-          className="absolute inset-0"
+          className="absolute inset-0 blur-[120px] opacity-80"
           style={{
             background:
               "linear-gradient(90deg, #0a1a3a, #0d3b66, #1b9aaa, #ffd166, #ef476f)",
-            filter: "blur(120px)",
-            opacity: 0.8,
           }}
+          suppressHydrationWarning
         />
 
       <div className="relative z-10 bg-black rounded-[36px] border border-white/10 px-24 py-28 text-center max-w-4xl">
@@ -96,13 +93,12 @@ export default function Page() {
       {/* ================= TEAM ================= */}
       <section className="relative py-40">
         <div
-          className="absolute left-0 top-0 h-full w-[35%]"
+          className="absolute left-0 top-0 h-full w-[35%] blur-[80px] opacity-45"
           style={{
             background:
               "linear-gradient(180deg, #0d3b66, #1b9aaa)",
-            filter: "blur(80px)",
-            opacity: 0.45,
           }}
+          suppressHydrationWarning
         />
 
         <div className="max-w-7xl mx-auto px-16 grid grid-cols-[1fr_2fr] gap-24 items-center">
@@ -152,6 +148,7 @@ export default function Page() {
                         background:
                           "linear-gradient(180deg, #4cc9f0, #ffd166, #ef476f)",
                       }}
+                      suppressHydrationWarning
                     >
                       <img
                         src={member.src}

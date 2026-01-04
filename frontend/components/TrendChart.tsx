@@ -23,10 +23,10 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
   // Downsample if dataset is large to improve render performance
   const displayData = useMemo(() => {
     if (!data || data.length === 0) return [];
-    
+
     const maxPoints = expanded ? 1000 : 400; // Reduced for better performance
     if (data.length <= maxPoints) return data;
-    
+
     const step = Math.ceil(data.length / maxPoints);
     return data.filter((_, i) => i % step === 0);
   }, [data, expanded]);
@@ -55,11 +55,11 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
 
         <div className="flex gap-4 text-xs font-mono">
           <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-price" />
+            <span className="w-2 h-2 rounded-full bg-[#FF6B6B]" />
             Price
           </span>
           <span className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-sentiment opacity-80" />
+            <span className="w-2 h-2 rounded-full bg-[#00FF88]" />
             Sentiment
           </span>
         </div>
@@ -71,8 +71,8 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
           <ComposedChart data={displayData}>
             <defs>
               <linearGradient id="sentimentGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#5B0779" stopOpacity={0.22} />
-                <stop offset="95%" stopColor="#5B0779" stopOpacity={0} />
+                <stop offset="5%" stopColor="#00FF88" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#00FF88" stopOpacity={0.05} />
               </linearGradient>
             </defs>
 
@@ -89,8 +89,8 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
 
             <YAxis
               yAxisId="left"
-              stroke="#525ECD"
-              tick={{ fill: "#525ECD", fontSize: 10 }}
+              stroke="#FF6B6B"
+              tick={{ fill: "#FF6B6B", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               width={40}
@@ -100,8 +100,8 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
               yAxisId="right"
               orientation="right"
               domain={[-1.5, 1.5]}
-              stroke="#5B0779"
-              tick={{ fill: "#5B0779", fontSize: 10 }}
+              stroke="#00FF88"
+              tick={{ fill: "#00FF88", fontSize: 10 }}
               tickLine={false}
               axisLine={false}
               width={40}
@@ -110,7 +110,7 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
             <Tooltip
               content={({ active, payload, label }: any) => {
                 if (!active || !payload || payload.length === 0) return null;
-                
+
                 const priceEntry = payload.find((p: any) => p.dataKey === "price");
                 const sentimentEntry = payload.find((p: any) => p.dataKey === "sentiment");
                 const priceVal = priceEntry ? priceEntry.value : null;
@@ -155,9 +155,9 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
               yAxisId="right"
               type="monotone"
               dataKey="sentiment"
-              stroke="#5B0779"
+              stroke="#00FF88"
               fill="url(#sentimentGradient)"
-              strokeWidth={1.5}
+              strokeWidth={2}
               dot={false}
               isAnimationActive={false}
             />
@@ -166,10 +166,10 @@ const TrendChart = React.memo(function TrendChart({ data, expanded }: TrendChart
               yAxisId="left"
               type="monotone"
               dataKey="price"
-              stroke="#525ECD"
+              stroke="#FF6B6B"
               strokeWidth={expanded ? 3 : 2}
               dot={false}
-              activeDot={{ r: expanded ? 6 : 4, fill: "#525ECD" }}
+              activeDot={{ r: expanded ? 6 : 4, fill: "#FF6B6B" }}
               isAnimationActive={false}
             />
           </ComposedChart>
